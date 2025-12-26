@@ -5,7 +5,7 @@ use tracing::{Level, event};
 use super::ErrorList;
 
 pub fn validate_email(email: &str) -> Result<bool, ErrorList> {
-    if email.contains('@') && email.len() > 3 {
+    if email.contains('@') && email.len() > 3 && email.len() <= 254 {
         return Ok(true);
     }
     Err(ErrorList::InvalidEmail)
