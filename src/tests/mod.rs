@@ -12,6 +12,19 @@ use reqwest::{Client, Response};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use sqlx::prelude::FromRow;
+use std::sync::Once;
+
+static INIT: Once = Once::new();
+
+/// Initialize tracing subscriber once for all tests
+fn init_tracing() {
+    INIT.call_once(|| {
+        tracing_subscriber::FmtSubscriber::builder()
+            .with_max_level(tracing::Level::INFO)
+            .with_test_writer()
+            .init();
+    });
+}
 
 #[derive(Serialize, Deserialize, FromRow, Debug)]
 struct Code {
@@ -24,6 +37,8 @@ struct Code {
 }
 
 async fn run_test_app() -> u16 {
+    init_tracing();
+
     let state = get_app_state().await;
     let app = get_app(state.clone());
 
@@ -61,7 +76,7 @@ async fn delete_reg(username: String, email: String) -> Result<(), anyhow::Error
         .bind(&email)
         .execute(&state.db_connection_pool)
         .await?;
-    sqlx::query("DELETE FROM SESSIONS WHERE username=$1")
+    sqlx::query("DELETE FROM SESSIONS WHERE email=$1")
         .bind(&username)
         .execute(&state.db_connection_pool)
         .await?;

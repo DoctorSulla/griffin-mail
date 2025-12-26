@@ -9,6 +9,7 @@ use std::{
     task::{Context, Poll},
 };
 use tower::{Layer, Service};
+use tracing::{Level, event};
 
 use crate::{AppState, auth::validate_cookie};
 
@@ -60,16 +61,21 @@ where
 
         Box::pin(async move {
             let response: Response = match validate_cookie(request.headers(), state).await {
-                Ok(username) => {
-                    request.headers_mut().insert(
-                        "username",
-                        HeaderValue::from_str(username.0.as_str()).unwrap(),
-                    );
+                Ok(email) => {
+                    request
+                        .headers_mut()
+                        .insert("email", HeaderValue::from_str(email.0.as_str()).unwrap());
 
                     let future = inner.call(request);
                     future.await?
                 }
-                _ => http::StatusCode::UNAUTHORIZED.into_response(),
+                _ => {
+                    event!(
+                        Level::WARN,
+                        "Attempt to access protected route without valid session"
+                    );
+                    http::StatusCode::UNAUTHORIZED.into_response()
+                }
             };
             Ok(response)
         })
