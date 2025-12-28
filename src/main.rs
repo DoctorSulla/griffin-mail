@@ -61,9 +61,11 @@ async fn main() {
 pub fn get_app(state: Arc<AppState>) -> Router {
     let protected_routes = get_protected_routes();
     let open_routes = get_open_routes();
+    let email_routes = get_email_routes();
 
     Router::new()
         .merge(protected_routes)
+        .merge(email_routes)
         .layer(ServiceBuilder::new().layer(ValidateSessionLayer::new(state.clone())))
         .merge(open_routes)
         .with_state(state.clone())

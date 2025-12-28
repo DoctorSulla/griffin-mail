@@ -25,19 +25,39 @@ pub fn get_protected_routes() -> Router<Arc<AppState>> {
 
 pub fn get_email_routes() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/email/list", get(email_route_handlers::get_list))
+        .route("/email/lists", post(email_route_handlers::create_list))
+        .route("/email/lists", get(email_route_handlers::get_lists))
         .route(
-            "/email/list",
+            "/email/lists/{id}",
+            get(email_route_handlers::get_list_by_id),
+        )
+        .route(
+            "/email/lists/{id}",
             post(email_route_handlers::send_email_to_list),
         )
         .route(
-            "/email/list",
+            "/email/lists/{id}/recipients",
             delete(email_route_handlers::delete_from_list),
         )
-        .route("/email/list", patch(email_route_handlers::add_to_list))
         .route(
-            "/email/list/{id}",
+            "/email/lists/{id}/recipients",
+            post(email_route_handlers::add_to_list),
+        )
+        .route(
+            "/email/lists/{id}",
             delete(email_route_handlers::delete_list),
+        )
+        .route(
+            "/email/lists/{id}/permissions",
+            get(email_route_handlers::get_list_permissions),
+        )
+        .route(
+            "/email/lists/{id}/permissions",
+            post(email_route_handlers::add_list_permissions),
+        )
+        .route(
+            "/email/lists/{id}/permissions",
+            delete(email_route_handlers::delete_list_permissions),
         )
 }
 
