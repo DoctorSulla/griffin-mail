@@ -19,6 +19,7 @@ use crate::utilities::start_session_cleaner;
 mod auth;
 mod config;
 mod default_route_handlers;
+mod email_route_handlers;
 mod middleware;
 mod routes;
 mod user;

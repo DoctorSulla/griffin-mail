@@ -1,7 +1,7 @@
-use crate::{AppState, default_route_handlers};
+use crate::{AppState, default_route_handlers, email_route_handlers};
 use axum::{
     Router,
-    routing::{get, patch, post},
+    routing::{delete, get, patch, post},
 };
 use std::sync::Arc;
 
@@ -20,6 +20,24 @@ pub fn get_protected_routes() -> Router<Arc<AppState>> {
         .route(
             "/account/verificationEmail",
             get(default_route_handlers::resend_verification_email),
+        )
+}
+
+pub fn get_email_routes() -> Router<Arc<AppState>> {
+    Router::new()
+        .route("/email/list", get(email_route_handlers::get_list))
+        .route(
+            "/email/list",
+            post(email_route_handlers::send_email_to_list),
+        )
+        .route(
+            "/email/list",
+            delete(email_route_handlers::delete_from_list),
+        )
+        .route("/email/list", patch(email_route_handlers::add_to_list))
+        .route(
+            "/email/list/{id}",
+            delete(email_route_handlers::delete_list),
         )
 }
 
