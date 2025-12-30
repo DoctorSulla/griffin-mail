@@ -554,9 +554,9 @@ pub async fn password_reset_initiate(
 
     // Send email
     let email = Email {
-        to: &user.email,
-        from: "registration@tld.com",
-        subject: String::from("Password Reset"),
+        to: user.email.clone(),
+        from: "registration@tld.com".to_string(),
+        subject: "Password Reset".to_string(),
         body: format!(
             "<p>A password reset was requested for your account.</p> \
             <p>Use this code to reset your password: {code}</p> \

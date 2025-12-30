@@ -5,7 +5,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::{fs::Permissions, sync::Arc};
 
 use crate::{config::AppState, user::User};
 
@@ -13,6 +13,16 @@ enum ListPermission {
     Read,
     Write,
     Send,
+}
+
+impl From<ListPermission> for String {
+    fn from(permission: ListPermission) -> Self {
+        match permission {
+            ListPermission::Read => "read".to_string(),
+            ListPermission::Write => "write".to_string(),
+            ListPermission::Send => "send".to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -47,17 +57,17 @@ pub struct ListWithRecipients {
     recipients: Vec<Recipient>,
 }
 
-async fn _user_has_permission(
+async fn user_has_permission(
     user: &User,
     state: Arc<AppState>,
     list_id: i32,
-    permission: &str,
+    permission: ListPermission,
 ) -> bool {
     let result = sqlx::query_scalar!(
         "SELECT EXISTS(SELECT 1 FROM list_user_permissions WHERE list_id = $1 AND user_email = $2 AND permission = $3)",
         list_id,
         user.email,
-        permission
+        String::from(permission)
     )
     .fetch_one(&state.db_connection_pool)
     .await;
@@ -130,11 +140,15 @@ pub async fn get_list_by_id(
 }
 
 pub async fn send_email_to_list(
-    State(_state): State<Arc<AppState>>,
-    _user: User,
-    Json(_payload): Json<serde_json::Value>,
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<i32>,
 ) -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+    if user_has_permission(&user, state.clone(), id, ListPermission::Send).await {
+        StatusCode::NOT_IMPLEMENTED
+    } else {
+        StatusCode::FORBIDDEN
+    }
 }
 
 pub async fn delete_from_list(

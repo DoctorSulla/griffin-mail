@@ -4,6 +4,7 @@ use argon2::{
 };
 use lettre::{Message, Transport};
 use rand::{Rng, thread_rng};
+use serde::{Deserialize, Serialize};
 
 use tracing::{Level, event};
 
@@ -13,15 +14,15 @@ use crate::AppState;
 
 use chrono::Utc;
 
-#[derive(Debug)]
-pub struct Email<'a> {
-    pub from: &'a str,
-    pub reply_to: Option<&'a str>,
-    pub to: &'a str,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Email {
+    pub from: String,
+    pub reply_to: Option<String>,
+    pub to: String,
     pub subject: String,
     pub body: String,
 }
-pub async fn send_email(state: Arc<AppState>, email: Email<'_>) -> Result<(), anyhow::Error> {
+pub async fn send_email(state: Arc<AppState>, email: Email) -> Result<(), anyhow::Error> {
     event!(Level::INFO, "The email to be sent to the user is {:?}", {
         &email
     });
@@ -53,7 +54,9 @@ pub fn hash_password(password: &str) -> String {
 pub fn verify_password(hash: &str, password: &str) -> bool {
     let argon2 = Argon2::default();
     let password_hash = PasswordHash::new(hash).expect("Unable to parse hash");
-    argon2.verify_password(password.as_bytes(), &password_hash).is_ok()
+    argon2
+        .verify_password(password.as_bytes(), &password_hash)
+        .is_ok()
 }
 
 pub fn generate_unique_id(length: u8) -> String {

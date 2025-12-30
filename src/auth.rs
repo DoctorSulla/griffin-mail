@@ -157,9 +157,9 @@ pub async fn send_verification_email(user: &User, state: Arc<AppState>) -> Resul
     let code = generate_unique_id(8);
 
     let email = Email {
-        to: to.as_str(),
-        from: "registration@tld.com",
-        subject: String::from("Verify your email"),
+        to,
+        from: "registration@tld.com".to_string(),
+        subject: "Verify your email".to_string(),
         body: format!(
             "<p>Thank you for registering.</p> <p>Please verify for your email using the following code {code}. Your code is valid for 1 hour.</p>"
         ),
