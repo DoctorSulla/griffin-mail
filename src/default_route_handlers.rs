@@ -110,6 +110,10 @@ pub enum ErrorList {
         "You must wait for your previous email verification code to expire before you can send another"
     )]
     PreviousCodeNotExpired,
+    #[error("Only admins can create new lists")]
+    OnlyAdminsCanCreateLists,
+    #[error("List not found or no permission")]
+    ListNotFoundOrNoPermission,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
