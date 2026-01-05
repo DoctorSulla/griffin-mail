@@ -114,6 +114,8 @@ pub enum ErrorList {
     OnlyAdminsCanCreateLists,
     #[error("List not found or no permission")]
     ListNotFoundOrNoPermission,
+    #[error("No write permission for list")]
+    NoWritePermission,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

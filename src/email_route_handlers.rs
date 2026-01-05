@@ -152,12 +152,23 @@ pub async fn send_email_to_list(
 }
 
 pub async fn delete_from_list(
-    State(_state): State<Arc<AppState>>,
-    _user: User,
-    Path(_id): Path<String>,
-    Json(_payload): Json<serde_json::Value>,
-) -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<i32>,
+    Json(recipient_ids): Json<Vec<i32>>,
+) -> Result<StatusCode, AppError> {
+    if user_has_permission(&user, state.clone(), id, ListPermission::Write).await {
+        sqlx::query!(
+            "DELETE FROM lists_to_recipients WHERE list_id = $1 AND recipient_id = ANY($2)",
+            id,
+            &recipient_ids
+        )
+        .execute(&state.db_connection_pool)
+        .await?;
+        Ok(StatusCode::OK)
+    } else {
+        Err(ErrorList::NoWritePermission.into())
+    }
 }
 
 pub async fn add_to_list(
