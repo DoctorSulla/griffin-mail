@@ -5,7 +5,7 @@ use axum::{
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
-use std::{fs::Permissions, sync::Arc};
+use std::sync::Arc;
 
 use crate::{config::AppState, user::User};
 
@@ -55,6 +55,12 @@ struct Recipient {
 pub struct ListWithRecipients {
     list: List,
     recipients: Vec<Recipient>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListUserPermission {
+    user_email: String,
+    permission: String,
 }
 
 async fn user_has_permission(
@@ -181,24 +187,93 @@ pub async fn add_to_list(
 }
 
 pub async fn delete_list(
-    State(_state): State<Arc<AppState>>,
-    _user: User,
-    Path(_id): Path<String>,
-) -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<i32>,
+) -> Result<(), AppError> {
+    if user_has_permission(&user, state.clone(), id, ListPermission::Write).await {
+        sqlx::query!("DELETE FROM lists WHERE id = $1", id)
+            .execute(&state.db_connection_pool)
+            .await?;
+        Ok(())
+    } else {
+        Err(ErrorList::NoWritePermission.into())
+    }
 }
 
-pub async fn get_list_permissions(State(_state): State<Arc<AppState>>, _user: User) -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+pub async fn get_list_permissions(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<i32>,
+) -> Result<Json<Vec<ListUserPermission>>, AppError> {
+    let permissions = sqlx::query_as!(
+        ListUserPermission,
+        "SELECT user_email, permission FROM list_user_permissions WHERE list_id = $1",
+        id
+    )
+    .fetch_all(&state.db_connection_pool)
+    .await?;
+
+    Ok(Json(permissions))
 }
 
-pub async fn add_list_permissions(State(_state): State<Arc<AppState>>, _user: User) -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+pub async fn add_list_permissions(
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<i32>,
+    Json(payload): Json<Vec<ListUserPermission>>,
+) -> Result<(), AppError> {
+    if user.auth_level == "admin" {
+        let user_emails = payload
+            .iter()
+            .map(|p| p.user_email.clone())
+            .collect::<Vec<_>>();
+        let permissions = payload
+            .iter()
+            .map(|p| p.permission.clone())
+            .collect::<Vec<_>>();
+
+        sqlx::query!(
+            "INSERT INTO list_user_permissions (list_id,user_email, permission)
+            SELECT $1,user_email,permission FROM UNNEST($2::text[], $3::text[]) AS t(user_email, permission)",
+            id,
+            &user_emails,
+            &permissions
+        )
+        .execute(&state.db_connection_pool)
+        .await?;
+        Ok(())
+    } else {
+        Err(ErrorList::NoWritePermission.into())
+    }
 }
 
 pub async fn delete_list_permissions(
-    State(_state): State<Arc<AppState>>,
-    _user: User,
-) -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<i32>,
+    Json(payload): Json<Vec<ListUserPermission>>,
+) -> Result<(), AppError> {
+    if user.auth_level == "admin" {
+        let user_emails = payload
+            .iter()
+            .map(|p| p.user_email.clone())
+            .collect::<Vec<_>>();
+        let permissions = payload
+            .iter()
+            .map(|p| p.permission.clone())
+            .collect::<Vec<_>>();
+
+        sqlx::query!(
+            "DELETE FROM list_user_permissions WHERE list_id = $1 AND (user_email,permission) IN((
+            SELECT user_email,permission FROM UNNEST($2::text[], $3::text[]) AS t(user_email, permission)))",
+            id,
+            &user_emails,
+            &permissions
+        )
+        .execute(&state.db_connection_pool)
+        .await?;
+        Ok(())
+    } else {
+        Err(ErrorList::NoWritePermission.into())
+    }
 }
