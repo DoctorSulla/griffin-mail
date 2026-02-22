@@ -7,7 +7,11 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::{config::AppState, user::User};
+use crate::{
+    config::AppState,
+    user::User,
+    utilities::{Email, send_email},
+};
 
 enum ListPermission {
     Read,
@@ -61,6 +65,14 @@ pub struct ListWithRecipients {
 pub struct ListUserPermission {
     user_email: String,
     permission: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListEmailRequest {
+    pub subject: String,
+    pub body: String,
+    pub from: Option<String>,
+    pub reply_to: Option<String>,
 }
 
 async fn user_has_permission(
@@ -149,11 +161,35 @@ pub async fn send_email_to_list(
     State(state): State<Arc<AppState>>,
     user: User,
     Path(id): Path<i32>,
-) -> StatusCode {
+    Json(payload): Json<ListEmailRequest>,
+) -> Result<StatusCode, AppError> {
     if user_has_permission(&user, state.clone(), id, ListPermission::Send).await {
-        StatusCode::NOT_IMPLEMENTED
+        let recipients = sqlx::query_as!(
+            Recipient,
+            "SELECT re.id,re.name, re.email FROM lists_to_recipients ltr JOIN recipients re ON ltr.recipient_id = re.id WHERE ltr.list_id = $1",
+            id
+        )
+        .fetch_all(&state.db_connection_pool)
+        .await?;
+
+        let from = payload
+            .from
+            .unwrap_or_else(|| state.config.email.username.clone());
+
+        for recipient in recipients {
+            let email = Email {
+                to: recipient.email,
+                from: from.clone(),
+                subject: payload.subject.clone(),
+                body: payload.body.clone(),
+                reply_to: payload.reply_to.clone(),
+            };
+            send_email(state.clone(), email).await?;
+        }
+
+        Ok(StatusCode::OK)
     } else {
-        StatusCode::FORBIDDEN
+        Ok(StatusCode::FORBIDDEN)
     }
 }
 
@@ -178,12 +214,25 @@ pub async fn delete_from_list(
 }
 
 pub async fn add_to_list(
-    State(_state): State<Arc<AppState>>,
-    _user: User,
-    Path(_id): Path<String>,
-    Json(_payload): Json<serde_json::Value>,
-) -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<i32>,
+    Json(recipient_ids): Json<Vec<i32>>,
+) -> Result<StatusCode, AppError> {
+    if user_has_permission(&user, state.clone(), id, ListPermission::Write).await {
+        sqlx::query!(
+            "INSERT INTO lists_to_recipients (list_id, recipient_id)
+            SELECT $1,recipient_id FROM UNNEST($2::integer[]) AS t(recipient_id)
+            ON CONFLICT (list_id, recipient_id) DO NOTHING",
+            id,
+            &recipient_ids
+        )
+        .execute(&state.db_connection_pool)
+        .await?;
+        Ok(StatusCode::OK)
+    } else {
+        Err(ErrorList::NoWritePermission.into())
+    }
 }
 
 pub async fn delete_list(
