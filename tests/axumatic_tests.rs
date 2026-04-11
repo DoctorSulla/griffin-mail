@@ -1,10 +1,10 @@
-use crate::config::get_config;
-use crate::default_route_handlers::{
+use griffin_mail::config::get_config;
+use griffin_mail::default_route_handlers::{
     ApiResponse, ChangePassword, LoginDetails, PasswordResetCompleteRequest,
     PasswordResetInitiateRequest, ResponseType,
 };
-use crate::utilities::generate_unique_id;
-use crate::{default_route_handlers::RegistrationDetails, get_app, get_app_state};
+use griffin_mail::utilities::generate_unique_id;
+use griffin_mail::{default_route_handlers::RegistrationDetails, get_app, get_app_state};
 use http::header::{CONTENT_TYPE, COOKIE};
 use http::{HeaderValue, StatusCode};
 use reqwest::header::HeaderMap;
