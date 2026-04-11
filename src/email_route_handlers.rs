@@ -3,6 +3,7 @@ use axum::{
     Json,
     extract::{Path, State},
     http::StatusCode,
+    response::IntoResponse,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -14,7 +15,7 @@ use crate::{
 };
 
 enum ListPermission {
-    Read,
+    _Read,
     Write,
     Send,
 }
@@ -22,7 +23,7 @@ enum ListPermission {
 impl From<ListPermission> for String {
     fn from(permission: ListPermission) -> Self {
         match permission {
-            ListPermission::Read => "read".to_string(),
+            ListPermission::_Read => "read".to_string(),
             ListPermission::Write => "write".to_string(),
             ListPermission::Send => "send".to_string(),
         }
@@ -43,7 +44,7 @@ pub struct List {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct NewRecipient {
+pub struct NewRecipient {
     email: String,
     name: String,
 }
@@ -90,10 +91,31 @@ async fn user_has_permission(
     .fetch_one(&state.db_connection_pool)
     .await;
 
-    match result {
-        Ok(Some(true)) => true,
-        _ => false,
+    matches!(result, Ok(Some(true)))
+}
+
+/// Add a new recipient who can then later be added to other lists
+pub async fn add_recipients(
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Json(payload): Json<Vec<NewRecipient>>,
+) -> Result<impl IntoResponse, AppError> {
+    if user.auth_level != *"admin" {
+        return Err(ErrorList::OnlyAdminsCanCreateRecipients.into());
     }
+
+    let user_names = payload.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
+    let user_emails = payload.iter().map(|f| f.email.clone()).collect::<Vec<_>>();
+
+    sqlx::query!(
+        "INSERT INTO recipients (name,email)
+            SELECT name,email FROM UNNEST($1::text[], $2::text[]) AS t(name, email) ON CONFLICT (name,email) DO NOTHING",
+        &user_names,
+        &user_emails
+    )
+    .execute(&state.db_connection_pool)
+    .await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Get lists that the user has read permission for
@@ -187,7 +209,7 @@ pub async fn send_email_to_list(
             send_email(state.clone(), email).await?;
         }
 
-        Ok(StatusCode::OK)
+        Ok(StatusCode::NO_CONTENT)
     } else {
         Ok(StatusCode::FORBIDDEN)
     }
@@ -207,7 +229,7 @@ pub async fn delete_from_list(
         )
         .execute(&state.db_connection_pool)
         .await?;
-        Ok(StatusCode::OK)
+        Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ErrorList::NoWritePermission.into())
     }
@@ -229,7 +251,7 @@ pub async fn add_to_list(
         )
         .execute(&state.db_connection_pool)
         .await?;
-        Ok(StatusCode::OK)
+        Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ErrorList::NoWritePermission.into())
     }
@@ -239,12 +261,12 @@ pub async fn delete_list(
     State(state): State<Arc<AppState>>,
     user: User,
     Path(id): Path<i32>,
-) -> Result<(), AppError> {
+) -> Result<StatusCode, AppError> {
     if user_has_permission(&user, state.clone(), id, ListPermission::Write).await {
         sqlx::query!("DELETE FROM lists WHERE id = $1", id)
             .execute(&state.db_connection_pool)
             .await?;
-        Ok(())
+        Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ErrorList::NoWritePermission.into())
     }
@@ -270,7 +292,7 @@ pub async fn add_list_permissions(
     user: User,
     Path(id): Path<i32>,
     Json(payload): Json<Vec<ListUserPermission>>,
-) -> Result<(), AppError> {
+) -> Result<StatusCode, AppError> {
     if user.auth_level == "admin" {
         let user_emails = payload
             .iter()
@@ -290,7 +312,7 @@ pub async fn add_list_permissions(
         )
         .execute(&state.db_connection_pool)
         .await?;
-        Ok(())
+        Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ErrorList::NoWritePermission.into())
     }
@@ -301,7 +323,7 @@ pub async fn delete_list_permissions(
     user: User,
     Path(id): Path<i32>,
     Json(payload): Json<Vec<ListUserPermission>>,
-) -> Result<(), AppError> {
+) -> Result<StatusCode, AppError> {
     if user.auth_level == "admin" {
         let user_emails = payload
             .iter()
@@ -321,7 +343,7 @@ pub async fn delete_list_permissions(
         )
         .execute(&state.db_connection_pool)
         .await?;
-        Ok(())
+        Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ErrorList::NoWritePermission.into())
     }

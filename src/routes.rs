@@ -32,6 +32,10 @@ pub fn get_email_routes() -> Router<Arc<AppState>> {
             get(email_route_handlers::get_list_by_id),
         )
         .route(
+            "/email/recipients",
+            post(email_route_handlers::add_recipients),
+        )
+        .route(
             "/email/lists/{id}",
             post(email_route_handlers::send_email_to_list),
         )

@@ -112,6 +112,8 @@ pub enum ErrorList {
     PreviousCodeNotExpired,
     #[error("Only admins can create new lists")]
     OnlyAdminsCanCreateLists,
+    #[error("Only admins can create new recipients")]
+    OnlyAdminsCanCreateRecipients,
     #[error("List not found or no permission")]
     ListNotFoundOrNoPermission,
     #[error("No write permission for list")]
