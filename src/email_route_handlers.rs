@@ -98,14 +98,20 @@ async fn user_has_permission(
 pub async fn add_recipients(
     State(state): State<Arc<AppState>>,
     user: User,
-    Json(payload): Json<Vec<NewRecipient>>,
+    Json(new_recipients): Json<Vec<NewRecipient>>,
 ) -> Result<impl IntoResponse, AppError> {
     if user.auth_level != *"admin" {
         return Err(ErrorList::OnlyAdminsCanCreateRecipients.into());
     }
 
-    let user_names = payload.iter().map(|f| f.name.clone()).collect::<Vec<_>>();
-    let user_emails = payload.iter().map(|f| f.email.clone()).collect::<Vec<_>>();
+    let user_names = new_recipients
+        .iter()
+        .map(|f| f.name.clone())
+        .collect::<Vec<_>>();
+    let user_emails = new_recipients
+        .iter()
+        .map(|f| f.email.clone())
+        .collect::<Vec<_>>();
 
     sqlx::query!(
         "INSERT INTO recipients (name,email)
