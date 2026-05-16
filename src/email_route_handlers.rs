@@ -18,6 +18,7 @@ enum ListPermission {
     _Read,
     Write,
     Send,
+    ChangePermission,
 }
 
 impl From<ListPermission> for String {
@@ -26,6 +27,23 @@ impl From<ListPermission> for String {
             ListPermission::_Read => "read".to_string(),
             ListPermission::Write => "write".to_string(),
             ListPermission::Send => "send".to_string(),
+            ListPermission::ChangePermission => "change_permission".to_string(),
+        }
+    }
+}
+
+enum GlobalPermission {
+    ManageList,
+    ManageRecipient,
+    ChangePermission,
+}
+
+impl From<GlobalPermission> for String {
+    fn from(permission: GlobalPermission) -> Self {
+        match permission {
+            GlobalPermission::ManageList => "manage_list".to_string(),
+            GlobalPermission::ManageRecipient => "manage_recipient".to_string(),
+            GlobalPermission::ChangePermission => "change_permission".to_string(),
         }
     }
 }
@@ -76,7 +94,7 @@ pub struct ListEmailRequest {
     pub reply_to: Option<String>,
 }
 
-async fn user_has_permission(
+async fn user_has_list_permission(
     user: &User,
     state: Arc<AppState>,
     list_id: i32,
@@ -85,6 +103,22 @@ async fn user_has_permission(
     let result = sqlx::query_scalar!(
         "SELECT EXISTS(SELECT 1 FROM list_user_permissions WHERE list_id = $1 AND user_email = $2 AND permission = $3)",
         list_id,
+        user.email,
+        String::from(permission)
+    )
+    .fetch_one(&state.db_connection_pool)
+    .await;
+
+    matches!(result, Ok(Some(true)))
+}
+
+async fn user_has_global_permission(
+    user: &User,
+    state: Arc<AppState>,
+    permission: GlobalPermission,
+) -> bool {
+    let result = sqlx::query_scalar!(
+        "SELECT EXISTS(SELECT 1 FROM global_user_permissions WHERE user_email = $1 AND permission = $2)",
         user.email,
         String::from(permission)
     )
@@ -115,7 +149,7 @@ pub async fn add_recipients(
 
     sqlx::query!(
         "INSERT INTO recipients (name,email)
-            SELECT name,email FROM UNNEST($1::text[], $2::text[]) AS t(name, email) ON CONFLICT (name,email) DO NOTHING",
+            SELECT name,email FROM UNNEST($1::text[], $2::text[]) AS t(name, email) ON CONFLICT (email) DO NOTHING",
         &user_names,
         &user_emails
     )
@@ -191,7 +225,7 @@ pub async fn send_email_to_list(
     Path(id): Path<i32>,
     Json(payload): Json<ListEmailRequest>,
 ) -> Result<StatusCode, AppError> {
-    if user_has_permission(&user, state.clone(), id, ListPermission::Send).await {
+    if user_has_list_permission(&user, state.clone(), id, ListPermission::Send).await {
         let recipients = sqlx::query_as!(
             Recipient,
             "SELECT re.id,re.name, re.email FROM lists_to_recipients ltr JOIN recipients re ON ltr.recipient_id = re.id WHERE ltr.list_id = $1",
@@ -227,7 +261,7 @@ pub async fn delete_from_list(
     Path(id): Path<i32>,
     Json(recipient_ids): Json<Vec<i32>>,
 ) -> Result<StatusCode, AppError> {
-    if user_has_permission(&user, state.clone(), id, ListPermission::Write).await {
+    if user_has_list_permission(&user, state.clone(), id, ListPermission::Write).await {
         sqlx::query!(
             "DELETE FROM lists_to_recipients WHERE list_id = $1 AND recipient_id = ANY($2)",
             id,
@@ -247,7 +281,7 @@ pub async fn add_to_list(
     Path(id): Path<i32>,
     Json(recipient_ids): Json<Vec<i32>>,
 ) -> Result<StatusCode, AppError> {
-    if user_has_permission(&user, state.clone(), id, ListPermission::Write).await {
+    if user_has_list_permission(&user, state.clone(), id, ListPermission::Write).await {
         sqlx::query!(
             "INSERT INTO lists_to_recipients (list_id, recipient_id)
             SELECT $1,recipient_id FROM UNNEST($2::integer[]) AS t(recipient_id)
@@ -268,7 +302,7 @@ pub async fn delete_list(
     user: User,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
-    if user_has_permission(&user, state.clone(), id, ListPermission::Write).await {
+    if user_has_list_permission(&user, state.clone(), id, ListPermission::Write).await {
         sqlx::query!("DELETE FROM lists WHERE id = $1", id)
             .execute(&state.db_connection_pool)
             .await?;

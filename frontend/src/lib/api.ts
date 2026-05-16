@@ -7,6 +7,10 @@ if (dev) {
 }
 
 
+export interface Recipient {
+	name: string;
+	email: string;
+}
 
 export interface GoogleLoginRequest {
 	jwt: string;
@@ -67,6 +71,10 @@ async function apiCall(
 			});
 			return error;
 		}
+		else if (response.status == 204) {
+			return { response_type: 'SuccessNoContent', message: '' }
+
+		}
 
 		const data = await response.json();
 		return data;
@@ -116,5 +124,9 @@ export const api = {
 
 	async getProfile(): Promise<ApiResponse> {
 		return apiCall('/account/profile', 'GET', null);
+	},
+
+	async addRecipients(recipients: Recipient[]): Promise<ApiResponse> {
+		return apiCall('/email/recipients', 'POST', recipients);
 	}
 };

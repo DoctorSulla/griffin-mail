@@ -1,11 +1,14 @@
-<script>
+<script lang="ts">
 	import CircleX from '@lucide/svelte/icons/circle-x';
 	import CirclePlus from '@lucide/svelte/icons/circle-plus';
+	import { api, type Recipient } from '$lib/api';
 
-	let recipients = $state([{ name: '', email: '' }]);
+	let recipients: Recipient[] = $state([{ name: '', email: '' }]);
 
-	function submitRecipients() {
-		console.log($state.snapshot(recipients));
+	let response = $state({ response_type: '', message: '' });
+
+	async function submitRecipients() {
+		api.addRecipients(recipients);
 	}
 </script>
 
@@ -26,7 +29,7 @@
 				type="email"
 				required
 			/>
-			{#if index > 0}
+			{#if recipients.length > 1}
 				<CircleX
 					onclick={() => recipients.splice(index, 1)}
 					class="mx-2 inline cursor-pointer text-red-600 hover:text-red-700"
@@ -39,7 +42,9 @@
 		onclick={() => recipients.push({ name: '', email: '' })}
 		class="cursor-pointer text-green-600 hover:text-green-700"
 	/>
-	<button type="submit" class="my-2 rounded-2xl border border-black bg-blue-300 p-2"
+	<button
+		type="submit"
+		class="my-2 rounded-xl border border-blue-400 bg-blue-300 px-4 py-2 ring-blue-300/50 hover:ring-2"
 		>Add Recipients</button
 	>
 </form>

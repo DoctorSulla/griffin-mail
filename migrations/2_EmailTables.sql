@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS list_permissions (
     permission VARCHAR(100) PRIMARY KEY
 );
 
-INSERT INTO list_permissions (permission) VALUES ('read'), ('write'), ('send')
+INSERT INTO list_permissions (permission) VALUES ('read'), ('write'), ('send'),('change_permissions')
 ON CONFLICT (permission) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS list_user_permissions (
@@ -31,6 +31,24 @@ CREATE TABLE IF NOT EXISTS list_user_permissions (
     permission VARCHAR(100) NOT NULL REFERENCES list_permissions(permission) ON DELETE CASCADE,
     UNIQUE(list_id, user_email, permission)
 );
+
+INSERT INTO list_permissions (permission) VALUES ('read'), ('write'), ('send'),('change_permission')
+ON CONFLICT (permission) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS global_permissions (
+    permission VARCHAR(100) PRIMARY KEY
+);
+
+INSERT INTO global_permissions (permission) VALUES ('manage_list'),('manage_recipient'),('change_permission')
+ON CONFLICT (permission) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS global_user_permissions (
+    id SERIAL PRIMARY KEY,
+    user_email VARCHAR(320) NOT NULL REFERENCES users(email) ON DELETE CASCADE,
+    permission VARCHAR(100) NOT NULL REFERENCES global_permissions(permission) ON DELETE CASCADE,
+    UNIQUE(user_email, permission)
+);
+
 
 CREATE INDEX IF NOT EXISTS idx_lists_to_recipients_list_id ON lists_to_recipients(list_id);
 CREATE INDEX IF NOT EXISTS idx_lists_to_recipients_email_id ON lists_to_recipients(recipient_id);
