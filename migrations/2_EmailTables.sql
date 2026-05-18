@@ -21,9 +21,6 @@ CREATE TABLE IF NOT EXISTS list_permissions (
     permission VARCHAR(100) PRIMARY KEY
 );
 
-INSERT INTO list_permissions (permission) VALUES ('read'), ('write'), ('send'),('change_permissions')
-ON CONFLICT (permission) DO NOTHING;
-
 CREATE TABLE IF NOT EXISTS list_user_permissions (
     id SERIAL PRIMARY KEY,
     list_id INTEGER NOT NULL REFERENCES lists(id) ON DELETE CASCADE,
@@ -50,7 +47,6 @@ CREATE TABLE IF NOT EXISTS global_user_permissions (
 );
 
 
-CREATE INDEX IF NOT EXISTS idx_lists_to_recipients_list_id ON lists_to_recipients(list_id);
-CREATE INDEX IF NOT EXISTS idx_lists_to_recipients_email_id ON lists_to_recipients(recipient_id);
-CREATE INDEX IF NOT EXISTS idx_list_user_permissions_list_id ON list_user_permissions(list_id);
+CREATE INDEX IF NOT EXISTS idx_lists_to_recipients_recipient_id ON lists_to_recipients(recipient_id);
 CREATE INDEX IF NOT EXISTS idx_list_user_permissions_user_email ON list_user_permissions(user_email);
+CREATE INDEX IF NOT EXISTS idx_global_user_permissions_permission ON global_user_permissions(permission);

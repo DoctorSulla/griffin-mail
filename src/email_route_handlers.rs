@@ -161,7 +161,7 @@ pub async fn add_recipients(
 pub async fn delete_recipient(
     State(state): State<Arc<AppState>>,
     user: User,
-    recipient_email: String,
+    Path(recipient_email): Path<String>,
 ) -> Result<StatusCode, AppError> {
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
         return Err(ErrorList::NoManageRecipientPermission.into());
@@ -192,13 +192,26 @@ pub async fn create_list(
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageList).await {
         return Err(ErrorList::NoManageListPermission.into());
     }
+
+    let mut tx = state.db_connection_pool.begin().await?;
+
     let id: i32 = sqlx::query_scalar!(
-        "INSERT INTO LISTS (name, description) VALUES ($1, $2) RETURNING id",
+        "INSERT INTO lists (name, description) VALUES ($1, $2) RETURNING id",
         create_list.name,
         create_list.description
     )
-    .fetch_one(&state.db_connection_pool)
+    .fetch_one(&mut *tx)
     .await?;
+
+    sqlx::query!(
+        "INSERT INTO list_user_permissions (list_id, user_email, permission) VALUES ($1, $2, 'read'), ($1, $2, 'write'), ($1, $2, 'send'), ($1, $2, 'change_permission')",
+        id,
+        user.email
+    )
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
 
     Ok(Json(List {
         id,
@@ -264,7 +277,7 @@ pub async fn send_email_to_list(
 
         Ok(StatusCode::NO_CONTENT)
     } else {
-        Ok(StatusCode::FORBIDDEN)
+        Err(ErrorList::Unauthorised.into())
     }
 }
 
@@ -327,8 +340,13 @@ pub async fn delete_list(
 
 pub async fn get_list_permissions(
     State(state): State<Arc<AppState>>,
+    user: User,
     Path(id): Path<i32>,
 ) -> Result<Json<Vec<UserPermission>>, AppError> {
+    if !user_has_list_permission(&user, state.clone(), id, ListPermission::_Read).await {
+        return Err(ErrorList::ListNotFoundOrNoPermission.into());
+    }
+
     let permissions = sqlx::query_as!(
         UserPermission,
         "SELECT user_email, permission FROM list_user_permissions WHERE list_id = $1",
