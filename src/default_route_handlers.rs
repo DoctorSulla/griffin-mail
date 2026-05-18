@@ -112,12 +112,16 @@ pub enum ErrorList {
     PreviousCodeNotExpired,
     #[error("Only admins can create new lists")]
     OnlyAdminsCanCreateLists,
-    #[error("Only admins can create new recipients")]
-    OnlyAdminsCanCreateRecipients,
+    #[error("You do not have permission to create or delete recipients")]
+    NoManageRecipientPermission,
+    #[error("You do not have permission to create or delete lists")]
+    NoManageListPermission,
     #[error("List not found or no permission")]
     ListNotFoundOrNoPermission,
     #[error("No write permission for list")]
     NoWritePermission,
+    #[error("No permission to manage global user permissions")]
+    NoManageGlobalPermission,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

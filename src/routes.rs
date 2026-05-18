@@ -63,6 +63,14 @@ pub fn get_email_routes() -> Router<Arc<AppState>> {
             "/email/lists/{id}/permissions",
             delete(email_route_handlers::delete_list_permissions),
         )
+        .route(
+            "/email/users/permissions",
+            post(email_route_handlers::add_global_permissions),
+        )
+        .route(
+            "/email/users/permissions",
+            delete(email_route_handlers::delete_global_permissions),
+        )
 }
 
 pub fn get_open_routes() -> Router<Arc<AppState>> {

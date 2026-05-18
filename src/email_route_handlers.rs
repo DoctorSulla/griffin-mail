@@ -81,7 +81,7 @@ pub struct ListWithRecipients {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ListUserPermission {
+pub struct UserPermission {
     user_email: String,
     permission: String,
 }
@@ -134,8 +134,8 @@ pub async fn add_recipients(
     user: User,
     Json(new_recipients): Json<Vec<NewRecipient>>,
 ) -> Result<impl IntoResponse, AppError> {
-    if user.auth_level != *"admin" {
-        return Err(ErrorList::OnlyAdminsCanCreateRecipients.into());
+    if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
+        return Err(ErrorList::NoManageRecipientPermission.into());
     }
 
     let user_names = new_recipients
@@ -158,6 +158,20 @@ pub async fn add_recipients(
     Ok(StatusCode::NO_CONTENT)
 }
 
+pub async fn delete_recipient(
+    State(state): State<Arc<AppState>>,
+    user: User,
+    recipient_email: String,
+) -> Result<StatusCode, AppError> {
+    if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
+        return Err(ErrorList::NoManageRecipientPermission.into());
+    }
+    sqlx::query!("DELETE FROM recipients WHERE email = $1", recipient_email)
+        .execute(&state.db_connection_pool)
+        .await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 /// Get lists that the user has read permission for
 pub async fn get_lists(
     State(state): State<Arc<AppState>>,
@@ -175,10 +189,9 @@ pub async fn create_list(
     user: User,
     Json(create_list): Json<NewList>,
 ) -> Result<Json<List>, AppError> {
-    if user.auth_level != *"admin" {
-        return Err(ErrorList::OnlyAdminsCanCreateLists.into());
+    if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageList).await {
+        return Err(ErrorList::NoManageListPermission.into());
     }
-
     let id: i32 = sqlx::query_scalar!(
         "INSERT INTO LISTS (name, description) VALUES ($1, $2) RETURNING id",
         create_list.name,
@@ -302,22 +315,22 @@ pub async fn delete_list(
     user: User,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
-    if user_has_list_permission(&user, state.clone(), id, ListPermission::Write).await {
+    if user_has_global_permission(&user, state.clone(), GlobalPermission::ManageList).await {
         sqlx::query!("DELETE FROM lists WHERE id = $1", id)
             .execute(&state.db_connection_pool)
             .await?;
         Ok(StatusCode::NO_CONTENT)
     } else {
-        Err(ErrorList::NoWritePermission.into())
+        Err(ErrorList::NoManageListPermission.into())
     }
 }
 
 pub async fn get_list_permissions(
     State(state): State<Arc<AppState>>,
     Path(id): Path<i32>,
-) -> Result<Json<Vec<ListUserPermission>>, AppError> {
+) -> Result<Json<Vec<UserPermission>>, AppError> {
     let permissions = sqlx::query_as!(
-        ListUserPermission,
+        UserPermission,
         "SELECT user_email, permission FROM list_user_permissions WHERE list_id = $1",
         id
     )
@@ -331,9 +344,9 @@ pub async fn add_list_permissions(
     State(state): State<Arc<AppState>>,
     user: User,
     Path(id): Path<i32>,
-    Json(payload): Json<Vec<ListUserPermission>>,
+    Json(payload): Json<Vec<UserPermission>>,
 ) -> Result<StatusCode, AppError> {
-    if user.auth_level == "admin" {
+    if user_has_list_permission(&user, state.clone(), id, ListPermission::ChangePermission).await {
         let user_emails = payload
             .iter()
             .map(|p| p.user_email.clone())
@@ -362,9 +375,9 @@ pub async fn delete_list_permissions(
     State(state): State<Arc<AppState>>,
     user: User,
     Path(id): Path<i32>,
-    Json(payload): Json<Vec<ListUserPermission>>,
+    Json(payload): Json<Vec<UserPermission>>,
 ) -> Result<StatusCode, AppError> {
-    if user.auth_level == "admin" {
+    if user_has_list_permission(&user, state.clone(), id, ListPermission::ChangePermission).await {
         let user_emails = payload
             .iter()
             .map(|p| p.user_email.clone())
@@ -386,5 +399,63 @@ pub async fn delete_list_permissions(
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(ErrorList::NoWritePermission.into())
+    }
+}
+
+pub async fn add_global_permissions(
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Json(payload): Json<Vec<UserPermission>>,
+) -> Result<StatusCode, AppError> {
+    if user_has_global_permission(&user, state.clone(), GlobalPermission::ChangePermission).await {
+        let user_emails = payload
+            .iter()
+            .map(|p| p.user_email.clone())
+            .collect::<Vec<_>>();
+        let permissions = payload
+            .iter()
+            .map(|p| p.permission.clone())
+            .collect::<Vec<_>>();
+
+        sqlx::query!(
+            "INSERT INTO global_user_permissions (user_email, permission)
+            SELECT user_email,permission FROM UNNEST($1::text[], $2::text[]) AS t(user_email, permission)",
+            &user_emails,
+            &permissions
+        )
+        .execute(&state.db_connection_pool)
+        .await?;
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ErrorList::NoManageGlobalPermission.into())
+    }
+}
+
+pub async fn delete_global_permissions(
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Json(payload): Json<Vec<UserPermission>>,
+) -> Result<StatusCode, AppError> {
+    if user_has_global_permission(&user, state.clone(), GlobalPermission::ChangePermission).await {
+        let user_emails = payload
+            .iter()
+            .map(|p| p.user_email.clone())
+            .collect::<Vec<_>>();
+        let permissions = payload
+            .iter()
+            .map(|p| p.permission.clone())
+            .collect::<Vec<_>>();
+
+        sqlx::query!(
+            "DELETE FROM global_user_permissions WHERE (user_email,permission) IN((
+            SELECT user_email,permission FROM UNNEST($1::text[], $2::text[]) AS t(user_email, permission)))",
+            &user_emails,
+            &permissions
+        )
+        .execute(&state.db_connection_pool)
+        .await?;
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ErrorList::NoManageGlobalPermission.into())
     }
 }
