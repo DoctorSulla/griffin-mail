@@ -91,4 +91,5 @@ pub fn get_open_routes() -> Router<Arc<AppState>> {
         )
         .route("/healthCheck", get(default_route_handlers::health_check))
         .route("/nonce", get(default_route_handlers::get_nonce))
+        .route("/unsubscribe", post(email_route_handlers::unsubscribe))
 }

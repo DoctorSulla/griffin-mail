@@ -22,6 +22,7 @@ Users are stored in the database with a hashed and salted password. I have also 
 The following environment variables are used:
 - AXUMATIC_PG_PASSWORD - This is where the password for PostgreSql is stored
 - AXUMATIC_SMTP_PASSWORD - This is where the SMTP password is stored
+- AXUMATIC_HMAC_SECRET - This is the secret key used to sign and verify unsubscribe links
 - AXUMATIC_ENVIRONMENT - This can be PROD or TEST and will determine whether to use config.toml or test-config.toml
 
 

@@ -122,6 +122,10 @@ pub enum ErrorList {
     NoWritePermission,
     #[error("No permission to manage global user permissions")]
     NoManageGlobalPermission,
+    #[error("Invalid unsubscribe signature")]
+    InvalidUnsubscribeSignature,
+    #[error("Unsubscribe link has expired")]
+    UnsubscribeLinkExpired,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

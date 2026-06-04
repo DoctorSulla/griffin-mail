@@ -67,6 +67,8 @@ pub struct ServerConfig {
     pub max_unsuccessful_login_attempts: i32,
     pub session_length_in_days: i64,
     pub google_client_id: String,
+    pub server_url: String,
+    pub hmac_secret: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -154,8 +156,11 @@ impl Config {
             env::var("AXUMATIC_PG_PASSWORD").expect("AXUMATIC_PG_PASSWORD variable not set");
         let smtp_password =
             env::var("AXUMATIC_SMTP_PASSWORD").expect("AXUMATIC_SMTP_PASSWORD variable not set");
+        let hmac_secret =
+            env::var("AXUMATIC_HMAC_SECRET").expect("AXUMATIC_HMAC_SECRET variable not set");
 
         self.database.password = Some(pg_password);
         self.email.password = Some(smtp_password);
+        self.server.hmac_secret = Some(hmac_secret);
     }
 }
