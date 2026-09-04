@@ -70,7 +70,7 @@ pub struct NewRecipient {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct Recipient {
+pub struct Recipient {
     id: i32,
     email: String,
     name: String,
@@ -158,6 +158,25 @@ pub async fn add_recipients(
     .execute(&state.db_connection_pool)
     .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Get all recipients for users who are allowed to manage the recipient directory.
+pub async fn get_recipients(
+    State(state): State<Arc<AppState>>,
+    user: User,
+) -> Result<Json<Vec<Recipient>>, AppError> {
+    if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
+        return Err(ErrorList::NoManageRecipientPermission.into());
+    }
+
+    let recipients = sqlx::query_as!(
+        Recipient,
+        "SELECT id, name, email FROM recipients ORDER BY name, email"
+    )
+    .fetch_all(&state.db_connection_pool)
+    .await?;
+
+    Ok(Json(recipients))
 }
 
 pub async fn delete_recipient(
@@ -253,8 +272,8 @@ fn generate_unsubscribe_link(server_url: &str, email: &str, hmac_secret: &str) -
     let expires = chrono::Utc::now().timestamp() + (30 * 24 * 60 * 60); // 30 days
     let unsubscribe_text = format!("{}|{}", expires, email);
 
-    let mut mac = HmacSha256::new_from_slice(hmac_secret.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        HmacSha256::new_from_slice(hmac_secret.as_bytes()).expect("HMAC can take key of any size");
     mac.update(unsubscribe_text.as_bytes());
 
     let signature_bytes = mac.finalize().into_bytes();
@@ -292,8 +311,12 @@ pub async fn send_email_to_list(
             let body = if server_url.is_empty() || hmac_secret.is_empty() {
                 payload.body.clone()
             } else {
-                let unsubscribe_link = generate_unsubscribe_link(&server_url, &recipient.email, &hmac_secret);
-                format!("{}\n\n---\nTo unsubscribe, click here: {}", payload.body, unsubscribe_link)
+                let unsubscribe_link =
+                    generate_unsubscribe_link(&server_url, &recipient.email, &hmac_secret);
+                format!(
+                    "{}\n\n---\nTo unsubscribe, click here: {}",
+                    payload.body, unsubscribe_link
+                )
             };
 
             let email = Email {
@@ -352,6 +375,31 @@ pub async fn add_to_list(
     } else {
         Err(ErrorList::NoWritePermission.into())
     }
+}
+
+/// Get recipients which can be added to a list.
+pub async fn get_available_recipients(
+    State(state): State<Arc<AppState>>,
+    user: User,
+    Path(id): Path<i32>,
+) -> Result<Json<Vec<Recipient>>, AppError> {
+    if !user_has_list_permission(&user, state.clone(), id, ListPermission::Write).await {
+        return Err(ErrorList::NoWritePermission.into());
+    }
+
+    let recipients = sqlx::query_as!(
+        Recipient,
+        "SELECT id, name, email FROM recipients
+         WHERE id NOT IN (
+             SELECT recipient_id FROM lists_to_recipients WHERE list_id = $1
+         )
+         ORDER BY name, email",
+        id
+    )
+    .fetch_all(&state.db_connection_pool)
+    .await?;
+
+    Ok(Json(recipients))
 }
 
 pub async fn delete_list(
@@ -509,15 +557,19 @@ pub async fn delete_global_permissions(
     }
 }
 
-fn verify_unsubscribe_signature(unsubscribe_text: &str, unsubscribe_signature: &str, hmac_secret: &str) -> Result<String, ErrorList> {
+fn verify_unsubscribe_signature(
+    unsubscribe_text: &str,
+    unsubscribe_signature: &str,
+    hmac_secret: &str,
+) -> Result<String, ErrorList> {
     type HmacSha256 = Hmac<Sha256>;
 
-    let mut mac = HmacSha256::new_from_slice(hmac_secret.as_bytes())
-        .expect("HMAC can take key of any size");
+    let mut mac =
+        HmacSha256::new_from_slice(hmac_secret.as_bytes()).expect("HMAC can take key of any size");
     mac.update(unsubscribe_text.as_bytes());
 
-    let signature_bytes = hex::decode(unsubscribe_signature)
-        .map_err(|_| ErrorList::InvalidUnsubscribeSignature)?;
+    let signature_bytes =
+        hex::decode(unsubscribe_signature).map_err(|_| ErrorList::InvalidUnsubscribeSignature)?;
 
     if mac.verify_slice(&signature_bytes[..]).is_err() {
         return Err(ErrorList::InvalidUnsubscribeSignature);
@@ -541,7 +593,11 @@ pub async fn unsubscribe(
     Json(payload): Json<UnsubscribeRequest>,
 ) -> Result<StatusCode, AppError> {
     let hmac_secret = state.config.server.hmac_secret.clone().unwrap_or_default();
-    let email = verify_unsubscribe_signature(&payload.unsubscribe_text, &payload.unsubscribe_signature, &hmac_secret)?;
+    let email = verify_unsubscribe_signature(
+        &payload.unsubscribe_text,
+        &payload.unsubscribe_signature,
+        &hmac_secret,
+    )?;
 
     sqlx::query!("DELETE FROM recipients WHERE email = $1", email)
         .execute(&state.db_connection_pool)
@@ -583,7 +639,8 @@ mod tests {
         let unsubscribe_signature = sig_param.strip_prefix("unsubscribe_signature=").unwrap();
 
         // Verify it should succeed
-        let result = verify_unsubscribe_signature(unsubscribe_text, unsubscribe_signature, TEST_HMAC_SECRET);
+        let result =
+            verify_unsubscribe_signature(unsubscribe_text, unsubscribe_signature, TEST_HMAC_SECRET);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), email);
     }
@@ -593,9 +650,13 @@ mod tests {
         let unsubscribe_text = "9999999999|test@example.com";
         let invalid_signature = "deadbeef";
 
-        let result = verify_unsubscribe_signature(unsubscribe_text, invalid_signature, TEST_HMAC_SECRET);
+        let result =
+            verify_unsubscribe_signature(unsubscribe_text, invalid_signature, TEST_HMAC_SECRET);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ErrorList::InvalidUnsubscribeSignature));
+        assert!(matches!(
+            result.unwrap_err(),
+            ErrorList::InvalidUnsubscribeSignature
+        ));
     }
 
     #[test]
@@ -612,9 +673,16 @@ mod tests {
         let signature_bytes = mac.finalize().into_bytes();
         let unsubscribe_signature = hex::encode(signature_bytes);
 
-        let result = verify_unsubscribe_signature(&unsubscribe_text, &unsubscribe_signature, TEST_HMAC_SECRET);
+        let result = verify_unsubscribe_signature(
+            &unsubscribe_text,
+            &unsubscribe_signature,
+            TEST_HMAC_SECRET,
+        );
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ErrorList::UnsubscribeLinkExpired));
+        assert!(matches!(
+            result.unwrap_err(),
+            ErrorList::UnsubscribeLinkExpired
+        ));
     }
 
     #[test]
@@ -624,7 +692,10 @@ mod tests {
 
         let result = verify_unsubscribe_signature(malformed_text, signature, TEST_HMAC_SECRET);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ErrorList::InvalidUnsubscribeSignature));
+        assert!(matches!(
+            result.unwrap_err(),
+            ErrorList::InvalidUnsubscribeSignature
+        ));
     }
 
     #[test]
@@ -632,7 +703,10 @@ mod tests {
         let unsubscribe_text = "9999999999|test@example.com";
         let result = verify_unsubscribe_signature(unsubscribe_text, "", TEST_HMAC_SECRET);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ErrorList::InvalidUnsubscribeSignature));
+        assert!(matches!(
+            result.unwrap_err(),
+            ErrorList::InvalidUnsubscribeSignature
+        ));
     }
 
     #[test]

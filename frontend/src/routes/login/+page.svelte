@@ -72,6 +72,12 @@
 				<div class="text-center text-sm text-red-600">{error}</div>
 			{/if}
 
+			<div class="text-right">
+				<a href="/resetPassword" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">
+					Forgot your password?
+				</a>
+			</div>
+
 			<div>
 				<button
 					type="submit"

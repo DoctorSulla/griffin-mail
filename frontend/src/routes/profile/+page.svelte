@@ -17,13 +17,14 @@
 		confirm_password: ''
 	};
 
-	const dateOptions = {
+	const dateOptions: Intl.DateTimeFormatOptions = {
 		year: 'numeric',
 		month: 'long',
 		day: 'numeric'
 	};
 
-	async function changePassword() {
+	async function changePassword(event: SubmitEvent) {
+		event.preventDefault();
 		loading = true;
 		let result = await api.changePassword(changePasswordRequest);
 
@@ -40,7 +41,8 @@
 		loading = false;
 	}
 
-	async function verifyEmail() {
+	async function verifyEmail(event: SubmitEvent) {
+		event.preventDefault();
 		loading = true;
 		let result = await api.verifyEmail({
 			email: email,
@@ -52,6 +54,19 @@
 		} else {
 			error = '';
 			goto('/profile');
+		}
+		loading = false;
+	}
+
+	async function resendVerificationEmail() {
+		loading = true;
+		error = '';
+		success = '';
+		const result = await api.resendVerificationEmail();
+		if (result.response_type === 'Error') {
+			error = result.message;
+		} else {
+			success = result.message;
 		}
 		loading = false;
 	}
@@ -76,7 +91,7 @@
 		{#if !profile.email_verified}
 			<li>Email: {email} <span class="text-red-500">&times; Unverified</span></li>
 			<li>
-				<form on:submit|preventDefault={verifyEmail}>
+				<form onsubmit={verifyEmail}>
 					<input
 						class="border border-blue-200"
 						type="text"
@@ -89,6 +104,14 @@
 					<button class="cursor-pointer rounded-2xl bg-blue-400 p-1 text-white">Verify Email</button
 					>
 				</form>
+				<button
+					type="button"
+					disabled={loading}
+					onclick={resendVerificationEmail}
+					class="mt-2 cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+				>
+					Resend verification email
+				</button>
 			</li>
 		{:else}
 			<li>Email: {email} <span class="text-green-500">&check; Verified</span></li>
@@ -101,7 +124,7 @@
 			{#if profile.identity_provider == 'default'}
 				<li>
 					<h1 class="text-2xl">Change password:</h1>
-					<form on:submit|preventDefault={changePassword}>
+					<form onsubmit={changePassword}>
 						<input
 							class="my-2 block border border-blue-200"
 							bind:value={changePasswordRequest.old_password}

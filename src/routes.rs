@@ -36,6 +36,14 @@ pub fn get_email_routes() -> Router<Arc<AppState>> {
             post(email_route_handlers::add_recipients),
         )
         .route(
+            "/email/recipients",
+            get(email_route_handlers::get_recipients),
+        )
+        .route(
+            "/email/recipients/{email}",
+            delete(email_route_handlers::delete_recipient),
+        )
+        .route(
             "/email/lists/{id}",
             post(email_route_handlers::send_email_to_list),
         )
@@ -46,6 +54,10 @@ pub fn get_email_routes() -> Router<Arc<AppState>> {
         .route(
             "/email/lists/{id}/recipients",
             post(email_route_handlers::add_to_list),
+        )
+        .route(
+            "/email/lists/{id}/recipients/available",
+            get(email_route_handlers::get_available_recipients),
         )
         .route(
             "/email/lists/{id}",
