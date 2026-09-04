@@ -631,8 +631,8 @@ pub async fn get_profile(user: User) -> Result<Json<ApiResponse>, AppError> {
 }
 
 pub async fn logout(State(state): State<Arc<AppState>>, user: User) -> Result<HeaderMap, AppError> {
-    sqlx::query("DELETE FROM sessions WHERE username=$1")
-        .bind(&user.username)
+    sqlx::query("DELETE FROM sessions WHERE email=$1")
+        .bind(&user.email)
         .execute(&state.db_connection_pool)
         .await?;
 
