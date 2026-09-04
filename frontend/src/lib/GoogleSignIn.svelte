@@ -23,10 +23,11 @@
 				callback: handleCredentialResponse,
 				nonce: nonce
 			});
-			google.accounts.id.renderButton(
-				googleButtonWrapper,
-				{ theme: 'outline', size: 'large', width: 1000 } // Customization options
-			);
+			google.accounts.id.renderButton(googleButtonWrapper, {
+				theme: 'outline',
+				size: 'large',
+				width: googleButtonWrapper.clientWidth.toString()
+			});
 			google.accounts.id.prompt(); // Also display the One Tap prompt
 		};
 		document.head.appendChild(script);
@@ -42,7 +43,7 @@
 	}
 </script>
 
-<div bind:this={googleButtonWrapper}></div>
+<div class="mx-auto flex w-full max-w-[400px] justify-center" bind:this={googleButtonWrapper}></div>
 {#if error}
 	<div class="text-center text-sm text-red-600">{error}</div>
 {/if}
