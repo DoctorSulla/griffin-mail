@@ -1,8 +1,8 @@
 use crate::{
     NONCE_STORE,
     auth::{
-        IdentityProvider, add_code, create_registration, has_valid_email_code,
-        send_verification_email,
+        IdentityProvider, add_code, create_registration, expired_session_cookie,
+        has_valid_email_code, send_verification_email,
     },
     user::{Profile, User, get_user_by_sub, get_user_by_username, update_google_user_email},
 };
@@ -13,8 +13,6 @@ use axum::{
     response::IntoResponse,
 };
 use chrono::Utc;
-use cookie::Cookie;
-use cookie::time::Duration;
 use http::header::{self, HeaderMap, SET_COOKIE};
 use jwt_verifier::JwtVerifierClient;
 use serde::{Deserialize, Serialize};
@@ -518,7 +516,7 @@ pub async fn change_password(
     State(state): State<Arc<AppState>>,
     user: User,
     Json(password_details): Json<ChangePassword>,
-) -> Result<Json<ApiResponse>, AppError> {
+) -> Result<(HeaderMap, Json<ApiResponse>), AppError> {
     if user.identity_provider != *"default" {
         return Err(ErrorList::UserDoesNotUsePassword.into());
     }
@@ -537,17 +535,31 @@ pub async fn change_password(
     }
 
     let hashed_password = hash_password(&password_details.password);
+    let mut tx = state.db_connection_pool.begin().await?;
 
     sqlx::query("UPDATE users SET hashed_password = $1 WHERE email = $2")
         .bind(hashed_password)
-        .bind(user.email)
-        .execute(&state.db_connection_pool)
+        .bind(&user.email)
+        .execute(&mut *tx)
         .await?;
 
-    Ok(Json(ApiResponse {
-        message: "Password changed successfully".to_string(),
-        response_type: ResponseType::PasswordChangeSuccess,
-    }))
+    sqlx::query("DELETE FROM sessions WHERE email = $1")
+        .bind(&user.email)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+
+    let mut headers = HeaderMap::new();
+    headers.insert(SET_COOKIE, expired_session_cookie().to_string().parse()?);
+
+    Ok((
+        headers,
+        Json(ApiResponse {
+            message: "Password changed successfully".to_string(),
+            response_type: ResponseType::PasswordChangeSuccess,
+        }),
+    ))
 }
 
 pub async fn password_reset_initiate(
@@ -592,37 +604,55 @@ pub async fn password_reset_initiate(
 pub async fn password_reset_complete(
     State(state): State<Arc<AppState>>,
     Json(password_reset_response): Json<PasswordResetCompleteRequest>,
-) -> Result<Json<ApiResponse>, AppError> {
+) -> Result<(HeaderMap, Json<ApiResponse>), AppError> {
     // Check if passwords match
     if password_reset_response.password != password_reset_response.confirm_password {
         return Err(ErrorList::NonMatchingPasswords.into());
     }
+    validate_password(&password_reset_response.password)?;
 
     // Check if code is valid
-    let code = sqlx::query_as::<_,CodeAndEmail>("SELECT code,email FROM codes WHERE code_type='PasswordReset' AND used=false AND expiry_ts > $1 AND code=$2")
+    let mut tx = state.db_connection_pool.begin().await?;
+    let code = sqlx::query_as::<_,CodeAndEmail>("SELECT code,email FROM codes WHERE code_type='PasswordReset' AND used=false AND expiry_ts > $1 AND code=$2 FOR UPDATE")
             .bind(Utc::now().timestamp())
-                    .bind(password_reset_response.code).fetch_optional(&state.db_connection_pool).await?;
+                    .bind(password_reset_response.code).fetch_optional(&mut *tx).await?;
 
     if let Some(code) = code {
         // Update password
         sqlx::query("UPDATE users SET hashed_password=$1, login_attempts=0 WHERE email=$2")
             .bind(hash_password(password_reset_response.password.as_str()))
-            .bind(code.1)
-            .execute(&state.db_connection_pool)
+            .bind(&code.1)
+            .execute(&mut *tx)
             .await?;
         // Mark code as used
-        sqlx::query("UPDATE codes SET used=true WHERE code=$1")
-            .bind(code.0)
-            .execute(&state.db_connection_pool)
+        sqlx::query(
+            "UPDATE codes SET used=true WHERE code=$1 AND email=$2 AND code_type='PasswordReset'",
+        )
+        .bind(&code.0)
+        .bind(&code.1)
+        .execute(&mut *tx)
+        .await?;
+
+        sqlx::query("DELETE FROM sessions WHERE email=$1")
+            .bind(&code.1)
+            .execute(&mut *tx)
             .await?;
     } else {
         return Err(ErrorList::InvalidVerificationCode.into());
     }
 
-    Ok(Json(ApiResponse {
-        message: "Password reset complete".to_string(),
-        response_type: ResponseType::PasswordResetSuccess,
-    }))
+    tx.commit().await?;
+
+    let mut headers = HeaderMap::new();
+    headers.insert(SET_COOKIE, expired_session_cookie().to_string().parse()?);
+
+    Ok((
+        headers,
+        Json(ApiResponse {
+            message: "Password reset complete".to_string(),
+            response_type: ResponseType::PasswordResetSuccess,
+        }),
+    ))
 }
 
 pub async fn get_profile(user: User) -> Result<Json<ApiResponse>, AppError> {
@@ -640,15 +670,11 @@ pub async fn logout(State(state): State<Arc<AppState>>, user: User) -> Result<He
         .execute(&state.db_connection_pool)
         .await?;
 
-    let logout_cookie = Cookie::build(("session-key", ""))
-        .max_age(Duration::days(-state.config.server.session_length_in_days))
-        .path("/")
-        .secure(true)
-        .http_only(true)
-        .build();
-
     let mut headers = HeaderMap::new();
-    headers.insert(header::SET_COOKIE, logout_cookie.to_string().parse()?);
+    headers.insert(
+        header::SET_COOKIE,
+        expired_session_cookie().to_string().parse()?,
+    );
     Ok(headers)
 }
 

@@ -19,6 +19,7 @@ use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, timeout::TimeoutLayer};
 use tracing::{Level, event, span};
 
+use crate::config::RuntimeEnvironment;
 use crate::utilities::start_session_cleaner;
 pub mod auth;
 pub mod config;
@@ -68,7 +69,7 @@ pub fn get_app(state: Arc<AppState>) -> Router {
     let open_routes = get_open_routes();
     let email_routes = get_email_routes();
 
-    Router::new()
+    let app = Router::new()
         .merge(protected_routes)
         .merge(email_routes)
         .layer(ServiceBuilder::new().layer(ValidateSessionLayer::new(state.clone())))
@@ -78,8 +79,13 @@ pub fn get_app(state: Arc<AppState>) -> Router {
         .layer(ServiceBuilder::new().layer(TimeoutLayer::with_status_code(
             StatusCode::REQUEST_TIMEOUT,
             Duration::from_secs(state.config.server.request_timeout),
-        )))
-        .layer(ServiceBuilder::new().layer(CorsLayer::very_permissive()))
+        )));
+
+    if state.config.environment == RuntimeEnvironment::Development {
+        app.layer(ServiceBuilder::new().layer(CorsLayer::very_permissive()))
+    } else {
+        app
+    }
 }
 
 pub async fn get_app_state() -> Arc<AppState> {
