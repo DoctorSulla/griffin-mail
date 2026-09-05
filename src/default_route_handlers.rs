@@ -7,7 +7,6 @@ use crate::{
     user::{Profile, User, get_user_by_sub, get_user_by_username, update_google_user_email},
 };
 use axum::{
-    async_trait,
     extract::{FromRequestParts, Json, State},
     http::StatusCode,
     response::IntoResponse,
@@ -204,7 +203,6 @@ pub struct RegistrationDetails {
 }
 
 // Used to extract the user from object from the username header
-#[async_trait]
 impl FromRequestParts<Arc<AppState>> for User {
     type Rejection = (StatusCode, &'static str);
 

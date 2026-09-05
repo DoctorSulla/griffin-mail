@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.89"
 argon2 = "0.5.3"
-axum = "0.7.7"
+axum = "0.8.9"
 chrono = "0.4.38"
 cookie = "0.18.1"
 futures = "0.3.31"
