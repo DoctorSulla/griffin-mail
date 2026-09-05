@@ -615,8 +615,251 @@ pub struct UnsubscribeRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{Config, DatabaseConfig, ServerConfig, SmtpConfig};
+    use lettre::SmtpTransport;
+    use sqlx::{PgPool, Row};
 
     const TEST_HMAC_SECRET: &str = "test-secret-key-12345";
+
+    fn test_user(email: &str) -> User {
+        User {
+            username: email.to_string(),
+            email: email.to_string(),
+            email_verified: true,
+            hashed_password: None,
+            auth_level: "user".to_string(),
+            login_attempts: 0,
+            registration_ts: 0,
+            identity_provider: "test".to_string(),
+        }
+    }
+
+    fn test_state(pool: PgPool) -> Arc<AppState> {
+        Arc::new(AppState {
+            db_connection_pool: pool,
+            email_connection_pool: SmtpTransport::builder_dangerous("localhost").build(),
+            config: Config {
+                server: ServerConfig {
+                    port: 0,
+                    request_timeout: 5,
+                    max_unsuccessful_login_attempts: 10,
+                    session_length_in_days: 1,
+                    google_client_id: String::new(),
+                    server_url: String::new(),
+                    hmac_secret: Some(TEST_HMAC_SECRET.to_string()),
+                },
+                database: DatabaseConfig {
+                    pool_size: 1,
+                    username: "test".to_string(),
+                    password: Some("test".to_string()),
+                    connection_url: "localhost/test".to_string(),
+                },
+                email: SmtpConfig {
+                    server_url: "localhost".to_string(),
+                    username: "test".to_string(),
+                    password: Some("test".to_string()),
+                    pool_size: 1,
+                    send_emails: false,
+                },
+            },
+        })
+    }
+
+    async fn insert_user(pool: &PgPool, email: &str) {
+        sqlx::query(
+            "INSERT INTO users (
+                email, email_verified, username, login_attempts, auth_level,
+                registration_ts, identity_provider
+             ) VALUES ($1, true, $1, 0, 'user', 0, 'test')",
+        )
+        .bind(email)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    async fn insert_list(pool: &PgPool, name: &str) -> i32 {
+        sqlx::query("INSERT INTO lists (name, description) VALUES ($1, '') RETURNING id")
+            .bind(name)
+            .fetch_one(pool)
+            .await
+            .unwrap()
+            .get("id")
+    }
+
+    async fn app_error_message(error: AppError) -> String {
+        let response = error.into_response();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice::<crate::default_route_handlers::ApiResponse>(&body)
+            .unwrap()
+            .message
+    }
+
+    async fn expect_ok<T>(result: Result<T, AppError>) -> T {
+        match result {
+            Ok(value) => value,
+            Err(error) => panic!(
+                "unexpected application error: {}",
+                app_error_message(error).await
+            ),
+        }
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn list_permissions_match_user_list_and_capability(pool: PgPool) {
+        insert_user(&pool, "alice@example.com").await;
+        insert_user(&pool, "bob@example.com").await;
+        let first_list = insert_list(&pool, "first").await;
+        let second_list = insert_list(&pool, "second").await;
+        sqlx::query(
+            "INSERT INTO list_user_permissions (list_id, user_email, permission)
+             VALUES ($1, 'alice@example.com', 'write')",
+        )
+        .bind(first_list)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let state = test_state(pool);
+        let alice = test_user("alice@example.com");
+        let bob = test_user("bob@example.com");
+
+        assert!(
+            user_has_list_permission(&alice, state.clone(), first_list, ListPermission::Write)
+                .await
+        );
+        assert!(
+            !user_has_list_permission(&alice, state.clone(), first_list, ListPermission::Send)
+                .await
+        );
+        assert!(
+            !user_has_list_permission(&alice, state.clone(), second_list, ListPermission::Write)
+                .await
+        );
+        assert!(!user_has_list_permission(&bob, state, first_list, ListPermission::Write).await);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn global_permissions_match_user_and_capability(pool: PgPool) {
+        insert_user(&pool, "alice@example.com").await;
+        insert_user(&pool, "bob@example.com").await;
+        sqlx::query(
+            "INSERT INTO global_user_permissions (user_email, permission)
+             VALUES ('alice@example.com', 'manage_list')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let state = test_state(pool);
+        let alice = test_user("alice@example.com");
+        let bob = test_user("bob@example.com");
+
+        assert!(
+            user_has_global_permission(&alice, state.clone(), GlobalPermission::ManageList).await
+        );
+        assert!(
+            !user_has_global_permission(&alice, state.clone(), GlobalPermission::ManageRecipient)
+                .await
+        );
+        assert!(!user_has_global_permission(&bob, state, GlobalPermission::ManageList).await);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_list_requires_manage_list_and_grants_creator_all_permissions(pool: PgPool) {
+        insert_user(&pool, "creator@example.com").await;
+        let user = test_user("creator@example.com");
+        let state = test_state(pool.clone());
+
+        let denied = create_list(
+            State(state.clone()),
+            test_user("creator@example.com"),
+            Json(NewList {
+                name: "denied".to_string(),
+                description: String::new(),
+            }),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            app_error_message(denied).await,
+            ErrorList::NoManageListPermission.to_string()
+        );
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM lists")
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            0
+        );
+
+        sqlx::query(
+            "INSERT INTO global_user_permissions (user_email, permission)
+             VALUES ('creator@example.com', 'manage_list')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let Json(created) = expect_ok(
+            create_list(
+                State(state),
+                user,
+                Json(NewList {
+                    name: "allowed".to_string(),
+                    description: "description".to_string(),
+                }),
+            )
+            .await,
+        )
+        .await;
+
+        let permissions = sqlx::query_scalar::<_, String>(
+            "SELECT permission FROM list_user_permissions
+             WHERE list_id = $1 AND user_email = 'creator@example.com'
+             ORDER BY permission",
+        )
+        .bind(created.id)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            permissions,
+            vec![
+                "change_permission".to_string(),
+                "read".to_string(),
+                "send".to_string(),
+                "write".to_string(),
+            ]
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn list_visibility_requires_explicit_read_permission(pool: PgPool) {
+        insert_user(&pool, "reader@example.com").await;
+        let visible_list = insert_list(&pool, "visible").await;
+        let hidden_list = insert_list(&pool, "hidden").await;
+        sqlx::query(
+            "INSERT INTO list_user_permissions (list_id, user_email, permission)
+             VALUES
+                ($1, 'reader@example.com', 'read'),
+                ($2, 'reader@example.com', 'write')",
+        )
+        .bind(visible_list)
+        .bind(hidden_list)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let Json(lists) =
+            expect_ok(get_lists(State(test_state(pool)), test_user("reader@example.com")).await)
+                .await;
+
+        assert_eq!(lists.len(), 1);
+        assert_eq!(lists[0].id, visible_list);
+    }
 
     #[test]
     fn test_generate_unsubscribe_link_produces_valid_signature() {
