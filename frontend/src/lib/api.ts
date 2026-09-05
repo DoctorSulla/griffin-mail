@@ -155,6 +155,7 @@ export const api = {
 
 	async logout() {
 		await fetch(`${API_BASE_URL}/account/logout`, {
+			method: 'POST',
 			credentials: 'include'
 		});
 	},
@@ -184,7 +185,7 @@ export const api = {
 	},
 
 	async resendVerificationEmail(): Promise<ApiResponse> {
-		return apiCall('/account/verificationEmail', 'GET');
+		return apiCall('/account/verificationEmail', 'POST');
 	},
 
 	async addRecipients(recipients: Recipient[]): Promise<ApiResponse> {

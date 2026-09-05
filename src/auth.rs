@@ -6,8 +6,8 @@ use crate::default_route_handlers::{
 use crate::user::User;
 use crate::utilities::{Email, generate_unique_id, hash_password, send_email};
 use chrono::Utc;
-use cookie::Cookie;
 use cookie::time::Duration;
+use cookie::{Cookie, SameSite};
 use http::HeaderMap;
 use sqlx::postgres::PgRow;
 use std::sync::Arc;
@@ -79,6 +79,7 @@ pub async fn create_session(user: &User, state: Arc<AppState>) -> Result<Cookie<
         .path("/")
         .secure(true)
         .http_only(true)
+        .same_site(SameSite::Lax)
         .build();
 
     let expiry = Utc::now().timestamp()
@@ -94,6 +95,16 @@ pub async fn create_session(user: &User, state: Arc<AppState>) -> Result<Cookie<
         .await?;
 
     Ok(session_cookie)
+}
+
+pub fn expired_session_cookie() -> Cookie<'static> {
+    Cookie::build(("session-key", ""))
+        .max_age(Duration::seconds(0))
+        .path("/")
+        .secure(true)
+        .http_only(true)
+        .same_site(SameSite::Lax)
+        .build()
 }
 
 pub async fn create_registration(

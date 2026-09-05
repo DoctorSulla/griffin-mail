@@ -23,9 +23,11 @@ pub struct Email {
     pub body: String,
 }
 pub async fn send_email(state: Arc<AppState>, email: Email) -> Result<(), anyhow::Error> {
-    event!(Level::INFO, "The email to be sent to the user is {:?}", {
-        &email
-    });
+    if state.config.environment == crate::config::RuntimeEnvironment::Development {
+        event!(Level::INFO, "Development email: {:?}", &email);
+    } else {
+        event!(Level::INFO, "Sending email");
+    }
 
     if state.config.email.send_emails {
         let email = Message::builder()

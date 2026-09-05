@@ -23,7 +23,9 @@ The following environment variables are used:
 - AXUMATIC_PG_PASSWORD - This is where the password for PostgreSql is stored
 - AXUMATIC_SMTP_PASSWORD - This is where the SMTP password is stored
 - AXUMATIC_HMAC_SECRET - This is the secret key used to sign and verify unsubscribe links
-- AXUMATIC_ENVIRONMENT - This can be PROD or TEST and will determine whether to use config.toml or test-config.toml
+- AXUMATIC_ENVIRONMENT - This can be PROD, DEV, or TEST. PROD uses config.toml;
+  DEV and TEST use test-config.toml. Permissive CORS and full development email
+  logging are enabled only in DEV.
 
 
 # Known issues
