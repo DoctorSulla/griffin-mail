@@ -128,10 +128,10 @@
 		>
 			<div class="h-28 bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600"></div>
 			<div class="px-6 pb-6 sm:px-8">
-				<div class="-mt-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+				<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 					<div class="flex items-end gap-4">
 						<div
-							class="flex size-24 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-blue-50 text-3xl font-bold text-blue-700 shadow-sm"
+							class="-mt-12 flex size-24 shrink-0 items-center justify-center rounded-2xl border-4 border-white bg-blue-50 text-3xl font-bold text-blue-700 shadow-sm"
 							aria-hidden="true"
 						>
 							{initials(profile.username)}
