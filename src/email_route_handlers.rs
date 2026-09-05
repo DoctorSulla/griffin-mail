@@ -615,7 +615,7 @@ pub struct UnsubscribeRequest {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Config, DatabaseConfig, ServerConfig, SmtpConfig};
+    use crate::config::{Config, DatabaseConfig, RuntimeEnvironment, ServerConfig, SmtpConfig};
     use lettre::SmtpTransport;
     use sqlx::{PgPool, Row};
 
@@ -639,6 +639,7 @@ mod tests {
             db_connection_pool: pool,
             email_connection_pool: SmtpTransport::builder_dangerous("localhost").build(),
             config: Config {
+                environment: RuntimeEnvironment::Test,
                 server: ServerConfig {
                     port: 0,
                     request_timeout: 5,
