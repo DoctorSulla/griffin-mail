@@ -50,6 +50,10 @@ export interface RegisterRequest {
 	confirm_password: string;
 }
 
+export interface SetupStatus {
+	needs_admin: boolean;
+}
+
 export interface VerifyEmailRequest {
 	email: string;
 	code: string;
@@ -161,6 +165,14 @@ export const api = {
 
 	async register(userData: RegisterRequest): Promise<ApiResponse> {
 		return apiCall('/account/register', 'POST', userData);
+	},
+
+	async getSetupStatus(): Promise<ResourceResult<SetupStatus>> {
+		return resourceCall('/setup');
+	},
+
+	async createAdministrator(userData: RegisterRequest): Promise<ApiResponse> {
+		return apiCall('/setup/administrator', 'POST', userData);
 	},
 
 	async verifyEmail(verifyEmail: VerifyEmailRequest): Promise<ApiResponse> {

@@ -1,4 +1,4 @@
-use crate::{AppState, default_route_handlers, email_route_handlers};
+use crate::{AppState, default_route_handlers, email_route_handlers, setup_route_handlers};
 use axum::{
     Router,
     routing::{delete, get, patch, post},
@@ -103,5 +103,10 @@ pub fn get_open_routes() -> Router<Arc<AppState>> {
         )
         .route("/healthCheck", get(default_route_handlers::health_check))
         .route("/nonce", get(default_route_handlers::get_nonce))
+        .route("/setup", get(setup_route_handlers::get_setup_status))
+        .route(
+            "/setup/administrator",
+            post(setup_route_handlers::create_administrator),
+        )
         .route("/unsubscribe", post(email_route_handlers::unsubscribe))
 }

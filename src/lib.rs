@@ -26,6 +26,7 @@ pub mod default_route_handlers;
 pub mod email_route_handlers;
 pub mod middleware;
 pub mod routes;
+pub mod setup_route_handlers;
 pub mod user;
 pub mod utilities;
 
