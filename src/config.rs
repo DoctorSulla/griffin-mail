@@ -25,6 +25,16 @@ pub struct Config {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub email: SmtpConfig,
+    #[serde(skip)]
+    pub environment: RuntimeEnvironment,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum RuntimeEnvironment {
+    Development,
+    Production,
+    #[default]
+    Test,
 }
 
 #[derive(Deserialize, Clone)]
@@ -99,11 +109,20 @@ impl From<AuthLevel> for String {
 
 pub fn get_config() -> Config {
     let environment = env::var("AXUMATIC_ENVIRONMENT").unwrap_or_else(|_| "TEST".to_string());
+    let runtime_environment = match environment.as_str() {
+        "DEV" => RuntimeEnvironment::Development,
+        "PROD" => RuntimeEnvironment::Production,
+        _ => RuntimeEnvironment::Test,
+    };
 
     // Open and parse the config file
-    let mut file = match environment.as_str() {
-        "PROD" => File::open("./config.toml").expect("Couldn't open config file"),
-        _ => File::open("./test-config.toml").expect("Couldn't open config file"),
+    let mut file = match runtime_environment {
+        RuntimeEnvironment::Production => {
+            File::open("./config.toml").expect("Couldn't open config file")
+        }
+        RuntimeEnvironment::Development | RuntimeEnvironment::Test => {
+            File::open("./test-config.toml").expect("Couldn't open config file")
+        }
     };
 
     let mut contents = String::new();
@@ -111,6 +130,7 @@ pub fn get_config() -> Config {
         .expect("Couldn't read config");
 
     let mut config: Config = toml::from_str(contents.as_str()).expect("Couldn't parse config");
+    config.environment = runtime_environment;
     config.populate_passwords();
     config
 }

@@ -340,6 +340,15 @@ async fn change_password() {
     assert!(test_new_creds.is_some());
 
     assert_eq!(response.response_type, ResponseType::PasswordChangeSuccess);
+
+    let old_session_response = client
+        .get(format!("{}:{}/account/profile", SERVER_URL, port))
+        .header(COOKIE, &session_cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(old_session_response.status(), StatusCode::UNAUTHORIZED);
+
     let _ = delete_reg(username, email).await;
 }
 
@@ -434,7 +443,9 @@ async fn reset_password() {
     let port = run_test_app().await;
     let client = Client::new();
     let url = format!("{}:{}/account/resetPassword", SERVER_URL, port);
-    let (username, email, _password, _response) = create_valid_reg(port).await;
+    let (username, email, password, _response) = create_valid_reg(port).await;
+    let session_key = login(email.clone(), password, port).await.unwrap();
+    let session_cookie = format!("session-key={session_key}");
 
     let initiate_reset_password_request = PasswordResetInitiateRequest(email.clone());
     let body = serde_json::to_string(&initiate_reset_password_request).unwrap();
@@ -479,6 +490,14 @@ async fn reset_password() {
         complete_reset_response.response_type,
         ResponseType::PasswordResetSuccess
     );
+
+    let old_session_response = client
+        .get(format!("{}:{}/account/profile", SERVER_URL, port))
+        .header(COOKIE, session_cookie)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(old_session_response.status(), StatusCode::UNAUTHORIZED);
 
     let _ = delete_reg(username, email).await;
 }

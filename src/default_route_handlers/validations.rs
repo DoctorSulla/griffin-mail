@@ -65,3 +65,16 @@ pub async fn is_unique(
     }
     Ok(true)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn password_policy_rejects_empty_passwords() {
+        assert!(matches!(
+            validate_password(""),
+            Err(ErrorList::InvalidPassword)
+        ));
+    }
+}

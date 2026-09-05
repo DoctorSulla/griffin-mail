@@ -16,10 +16,10 @@ pub fn get_protected_routes() -> Router<Arc<AppState>> {
             patch(default_route_handlers::change_password),
         )
         .route("/account/profile", get(default_route_handlers::get_profile))
-        .route("/account/logout", get(default_route_handlers::logout))
+        .route("/account/logout", post(default_route_handlers::logout))
         .route(
             "/account/verificationEmail",
-            get(default_route_handlers::resend_verification_email),
+            post(default_route_handlers::resend_verification_email),
         )
 }
 
