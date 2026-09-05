@@ -28,6 +28,7 @@
 			navigation: false
 		},
 		{ text: 'Unsubscribe', href: '/unsubscribe', allowed: 'always', navigation: false },
+		{ text: 'Initial setup', href: '/setup', allowed: 'always', navigation: false },
 		{ text: 'Lists', href: '/lists', allowed: 'authenticated' },
 		{ text: 'List details', href: '/lists/detail', allowed: 'authenticated', navigation: false },
 		{ text: 'Recipients', href: '/addRecipients', allowed: 'authenticated' },
@@ -51,6 +52,14 @@
 
 	afterNavigate(async function () {
 		let route = currentRoute();
+		const setup = await api.getSetupStatus();
+		if (setup.ok && setup.data?.needs_admin) {
+			if (route?.href !== '/setup') {
+				goto('/setup');
+			}
+			return;
+		}
+
 		let response = await api.getProfile();
 		if (response.response_type == 'Error') {
 			loggedIn = false;
@@ -59,6 +68,8 @@
 			);
 			if (route?.allowed == 'authenticated') {
 				goto('/login');
+			} else if (route?.href === '/setup') {
+				goto('/');
 			}
 		} else {
 			loggedIn = true;
@@ -66,6 +77,8 @@
 				(route) => route.navigation !== false && route.allowed !== 'unauthenticated'
 			);
 			if (route?.allowed == 'unauthenticated') {
+				goto('/profile');
+			} else if (route?.href === '/setup') {
 				goto('/profile');
 			}
 		}

@@ -25,7 +25,7 @@ use validations::*;
 use crate::{AppState, user::get_user_by_email};
 use crate::{auth::create_session, utilities::*};
 
-mod validations;
+pub(crate) mod validations;
 
 // Wrapper to allow derived impl of FromRow
 #[derive(FromRow)]
@@ -124,6 +124,8 @@ pub enum ErrorList {
     InvalidUnsubscribeSignature,
     #[error("Unsubscribe link has expired")]
     UnsubscribeLinkExpired,
+    #[error("An administrator account has already been configured")]
+    AdministratorAlreadyConfigured,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -144,6 +146,7 @@ pub enum ResponseType {
     UserProfile,
     Nonce,
     ResendVerificationEmailSuccess,
+    SetupSuccess,
 }
 
 impl From<ResponseType> for String {
@@ -163,6 +166,7 @@ impl From<ResponseType> for String {
             ResponseType::ResendVerificationEmailSuccess => {
                 "ResendVerificationEmailSuccess".to_string()
             }
+            ResponseType::SetupSuccess => "SetupSuccess".to_string(),
         }
     }
 }
