@@ -54,6 +54,12 @@ export interface SetupStatus {
 	needs_admin: boolean;
 }
 
+export interface InstanceStats {
+	recipients: number;
+	lists: number;
+	users: number;
+}
+
 export interface VerifyEmailRequest {
 	email: string;
 	code: string;
@@ -170,6 +176,10 @@ export const api = {
 
 	async getSetupStatus(): Promise<ResourceResult<SetupStatus>> {
 		return resourceCall('/setup');
+	},
+
+	async getInstanceStats(): Promise<ResourceResult<InstanceStats>> {
+		return resourceCall('/stats');
 	},
 
 	async createAdministrator(userData: RegisterRequest): Promise<ApiResponse> {

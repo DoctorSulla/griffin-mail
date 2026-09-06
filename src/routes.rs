@@ -102,6 +102,7 @@ pub fn get_open_routes() -> Router<Arc<AppState>> {
             patch(default_route_handlers::password_reset_complete),
         )
         .route("/healthCheck", get(default_route_handlers::health_check))
+        .route("/stats", get(default_route_handlers::get_instance_stats))
         .route("/nonce", get(default_route_handlers::get_nonce))
         .route("/setup", get(setup_route_handlers::get_setup_status))
         .route(
