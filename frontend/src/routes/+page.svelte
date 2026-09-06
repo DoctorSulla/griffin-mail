@@ -4,6 +4,7 @@
 	import List from '@lucide/svelte/icons/list';
 	import Contact from '@lucide/svelte/icons/contact';
 	import { api, type InstanceStats } from '$lib/api';
+	import logo from '$lib/assets/favicon.svg';
 
 	let stats = $state<InstanceStats>();
 	let error = $state('');
@@ -25,10 +26,15 @@
 </script>
 
 <section class="py-8">
-	<h1 class="text-3xl font-semibold text-blue-700">Griffin Mail</h1>
-	<p class="mt-3 max-w-2xl text-lg text-gray-600">
-		Welcome to Griffin Mail. Here is a summary of this running instance.
-	</p>
+	<div class="flex items-center gap-4">
+		<img src={logo} alt="" width="80" height="80" class="size-20 shrink-0" />
+		<div>
+			<h1 class="text-3xl font-bold text-gray-900">Griffin Mail</h1>
+			<p class="mt-2 max-w-2xl text-lg text-gray-600">
+				Welcome to Griffin Mail. Here is a summary of this running instance.
+			</p>
+		</div>
+	</div>
 
 	<h2 class="mt-10 text-xl font-semibold text-gray-900">Instance statistics</h2>
 	{#if error}
