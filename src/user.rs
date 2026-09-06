@@ -1,13 +1,19 @@
 use anyhow::anyhow;
 use axum::{
+    Json,
     extract::FromRequestParts,
     http::{StatusCode, request::Parts},
+    response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use sqlx::FromRow;
 
 use crate::config::AppState;
 use std::{ops::Deref, sync::Arc};
+
+const EMAIL_VERIFICATION_REQUIRED: &str =
+    "Please verify your email before using permission-protected features";
 
 #[derive(Serialize, Deserialize, Debug, FromRow)]
 pub struct User {
@@ -39,21 +45,32 @@ impl TryFrom<User> for VerifiedEmailUser {
         if user.email_verified {
             Ok(Self(user))
         } else {
-            Err("Email verification is required to use permissions")
+            Err(EMAIL_VERIFICATION_REQUIRED)
         }
     }
 }
 
 impl FromRequestParts<Arc<AppState>> for VerifiedEmailUser {
-    type Rejection = (StatusCode, &'static str);
+    type Rejection = Response;
 
     async fn from_request_parts(
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        let user = User::from_request_parts(parts, state).await?;
+        let user = User::from_request_parts(parts, state)
+            .await
+            .map_err(IntoResponse::into_response)?;
 
-        Self::try_from(user).map_err(|message| (StatusCode::FORBIDDEN, message))
+        Self::try_from(user).map_err(|message| {
+            (
+                StatusCode::FORBIDDEN,
+                Json(json!({
+                    "response_type": "Error",
+                    "message": message,
+                })),
+            )
+                .into_response()
+        })
     }
 }
 
@@ -142,7 +159,10 @@ mod tests {
 
     #[test]
     fn verified_email_user_requires_a_verified_email() {
-        assert!(VerifiedEmailUser::try_from(user(false)).is_err());
+        assert_eq!(
+            VerifiedEmailUser::try_from(user(false)).err(),
+            Some("Please verify your email before using permission-protected features")
+        );
         assert!(VerifiedEmailUser::try_from(user(true)).is_ok());
     }
 }
