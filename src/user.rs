@@ -1,9 +1,13 @@
 use anyhow::anyhow;
+use axum::{
+    extract::FromRequestParts,
+    http::{StatusCode, request::Parts},
+};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
 use crate::config::AppState;
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
 #[derive(Serialize, Deserialize, Debug, FromRow)]
 pub struct User {
@@ -15,6 +19,42 @@ pub struct User {
     pub login_attempts: i32,
     pub registration_ts: i64,
     pub identity_provider: String,
+}
+
+/// A user whose email address is verified and can therefore exercise permissions.
+pub struct VerifiedEmailUser(User);
+
+impl Deref for VerifiedEmailUser {
+    type Target = User;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl TryFrom<User> for VerifiedEmailUser {
+    type Error = &'static str;
+
+    fn try_from(user: User) -> Result<Self, Self::Error> {
+        if user.email_verified {
+            Ok(Self(user))
+        } else {
+            Err("Email verification is required to use permissions")
+        }
+    }
+}
+
+impl FromRequestParts<Arc<AppState>> for VerifiedEmailUser {
+    type Rejection = (StatusCode, &'static str);
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &Arc<AppState>,
+    ) -> Result<Self, Self::Rejection> {
+        let user = User::from_request_parts(parts, state).await?;
+
+        Self::try_from(user).map_err(|message| (StatusCode::FORBIDDEN, message))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -81,4 +121,28 @@ pub async fn update_google_user_email(
         .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{User, VerifiedEmailUser};
+
+    fn user(email_verified: bool) -> User {
+        User {
+            username: "user".to_string(),
+            email: "user@example.com".to_string(),
+            email_verified,
+            hashed_password: None,
+            auth_level: "User".to_string(),
+            login_attempts: 0,
+            registration_ts: 0,
+            identity_provider: "default".to_string(),
+        }
+    }
+
+    #[test]
+    fn verified_email_user_requires_a_verified_email() {
+        assert!(VerifiedEmailUser::try_from(user(false)).is_err());
+        assert!(VerifiedEmailUser::try_from(user(true)).is_ok());
+    }
 }
