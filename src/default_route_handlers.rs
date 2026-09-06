@@ -697,6 +697,28 @@ pub async fn health_check() -> http::status::StatusCode {
     http::status::StatusCode::NO_CONTENT
 }
 
+#[derive(Serialize, FromRow)]
+pub struct InstanceStats {
+    pub recipients: i64,
+    pub lists: i64,
+    pub users: i64,
+}
+
+pub async fn get_instance_stats(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<InstanceStats>, AppError> {
+    let stats = sqlx::query_as::<_, InstanceStats>(
+        "SELECT
+            (SELECT COUNT(*) FROM recipients) AS recipients,
+            (SELECT COUNT(*) FROM lists) AS lists,
+            (SELECT COUNT(*) FROM users) AS users",
+    )
+    .fetch_one(&state.db_connection_pool)
+    .await?;
+
+    Ok(Json(stats))
+}
+
 pub async fn get_nonce() -> Result<Json<ApiResponse>, AppError> {
     const NONCE_EXPIRATION: i64 = 300;
 
