@@ -13,7 +13,7 @@ use tracing::{Level, event};
 
 use crate::{
     config::AppState,
-    user::User,
+    user::{User, VerifiedEmailUser},
     utilities::{Email, send_email},
 };
 
@@ -150,7 +150,7 @@ async fn user_has_global_permission(
 /// Add a new recipient who can then later be added to other lists
 pub async fn add_recipients(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Json(new_recipients): Json<Vec<NewRecipient>>,
 ) -> Result<impl IntoResponse, AppError> {
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
@@ -188,7 +188,7 @@ pub async fn add_recipients(
 /// Get all recipients for users who are allowed to manage the recipient directory.
 pub async fn get_recipients(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
 ) -> Result<Json<Vec<Recipient>>, AppError> {
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
         log_permission_denied(&user, "get_recipients", "global:manage_recipient", None);
@@ -207,7 +207,7 @@ pub async fn get_recipients(
 
 pub async fn delete_recipient(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(recipient_email): Path<String>,
 ) -> Result<StatusCode, AppError> {
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
@@ -230,7 +230,7 @@ pub async fn delete_recipient(
 /// Get lists that the user has read permission for
 pub async fn get_lists(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
 ) -> Result<Json<Vec<List>>, AppError> {
     let lists = sqlx::query_as!(List, "SELECT id, name, description FROM LISTS WHERE id IN (SELECT list_id FROM list_user_permissions WHERE user_email = $1 and permission = $2)",user.email, "read")
         .fetch_all(&state.db_connection_pool) .await?;
@@ -241,7 +241,7 @@ pub async fn get_lists(
 /// Create a new empty list
 pub async fn create_list(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Json(create_list): Json<NewList>,
 ) -> Result<Json<List>, AppError> {
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageList).await {
@@ -285,7 +285,7 @@ pub async fn create_list(
 
 pub async fn get_list_by_id(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(id): Path<i32>,
 ) -> Result<Json<ListWithRecipients>, AppError> {
     let list = sqlx::query_as!(
@@ -333,7 +333,7 @@ fn generate_unsubscribe_link(server_url: &str, email: &str, hmac_secret: &str) -
 
 pub async fn send_email_to_list(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(id): Path<i32>,
     Json(payload): Json<ListEmailRequest>,
 ) -> Result<StatusCode, AppError> {
@@ -392,7 +392,7 @@ pub async fn send_email_to_list(
 
 pub async fn delete_from_list(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(id): Path<i32>,
     Json(recipient_ids): Json<Vec<i32>>,
 ) -> Result<StatusCode, AppError> {
@@ -421,7 +421,7 @@ pub async fn delete_from_list(
 
 pub async fn add_to_list(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(id): Path<i32>,
     Json(recipient_ids): Json<Vec<i32>>,
 ) -> Result<StatusCode, AppError> {
@@ -453,7 +453,7 @@ pub async fn add_to_list(
 /// Get recipients which can be added to a list.
 pub async fn get_available_recipients(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(id): Path<i32>,
 ) -> Result<Json<Vec<Recipient>>, AppError> {
     if !user_has_list_permission(&user, state.clone(), id, ListPermission::Write).await {
@@ -478,7 +478,7 @@ pub async fn get_available_recipients(
 
 pub async fn delete_list(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     if user_has_global_permission(&user, state.clone(), GlobalPermission::ManageList).await {
@@ -501,7 +501,7 @@ pub async fn delete_list(
 
 pub async fn get_list_permissions(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(id): Path<i32>,
 ) -> Result<Json<Vec<UserPermission>>, AppError> {
     if !user_has_list_permission(&user, state.clone(), id, ListPermission::_Read).await {
@@ -522,7 +522,7 @@ pub async fn get_list_permissions(
 
 pub async fn add_list_permissions(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(id): Path<i32>,
     Json(payload): Json<Vec<UserPermission>>,
 ) -> Result<StatusCode, AppError> {
@@ -567,7 +567,7 @@ pub async fn add_list_permissions(
 
 pub async fn delete_list_permissions(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Path(id): Path<i32>,
     Json(payload): Json<Vec<UserPermission>>,
 ) -> Result<StatusCode, AppError> {
@@ -612,7 +612,7 @@ pub async fn delete_list_permissions(
 
 pub async fn add_global_permissions(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Json(payload): Json<Vec<UserPermission>>,
 ) -> Result<StatusCode, AppError> {
     if user_has_global_permission(&user, state.clone(), GlobalPermission::ChangePermission).await {
@@ -654,7 +654,7 @@ pub async fn add_global_permissions(
 
 pub async fn delete_global_permissions(
     State(state): State<Arc<AppState>>,
-    user: User,
+    user: VerifiedEmailUser,
     Json(payload): Json<Vec<UserPermission>>,
 ) -> Result<StatusCode, AppError> {
     if user_has_global_permission(&user, state.clone(), GlobalPermission::ChangePermission).await {
