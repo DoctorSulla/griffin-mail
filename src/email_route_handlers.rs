@@ -9,6 +9,7 @@ use hmac::{Hmac, KeyInit, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::sync::Arc;
+use tracing::{Level, event};
 
 use crate::{
     config::AppState,
@@ -48,6 +49,22 @@ impl From<GlobalPermission> for String {
             GlobalPermission::ChangePermission => "change_permission".to_string(),
         }
     }
+}
+
+fn log_permission_denied(
+    user: &User,
+    operation: &str,
+    required_permission: &str,
+    list_id: Option<i32>,
+) {
+    event!(
+        Level::WARN,
+        user_email = %user.email,
+        operation,
+        required_permission,
+        ?list_id,
+        "Permission denied"
+    );
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -137,6 +154,7 @@ pub async fn add_recipients(
     Json(new_recipients): Json<Vec<NewRecipient>>,
 ) -> Result<impl IntoResponse, AppError> {
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
+        log_permission_denied(&user, "add_recipients", "global:manage_recipient", None);
         return Err(ErrorList::NoManageRecipientPermission.into());
     }
 
@@ -149,7 +167,7 @@ pub async fn add_recipients(
         .map(|f| f.email.clone())
         .collect::<Vec<_>>();
 
-    sqlx::query!(
+    let result = sqlx::query!(
         "INSERT INTO recipients (name,email)
             SELECT name,email FROM UNNEST($1::text[], $2::text[]) AS t(name, email) ON CONFLICT (email) DO NOTHING",
         &user_names,
@@ -157,6 +175,13 @@ pub async fn add_recipients(
     )
     .execute(&state.db_connection_pool)
     .await?;
+    event!(
+        Level::INFO,
+        user_email = %user.email,
+        requested_count = new_recipients.len(),
+        inserted_count = result.rows_affected(),
+        "Recipients added"
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -166,6 +191,7 @@ pub async fn get_recipients(
     user: User,
 ) -> Result<Json<Vec<Recipient>>, AppError> {
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
+        log_permission_denied(&user, "get_recipients", "global:manage_recipient", None);
         return Err(ErrorList::NoManageRecipientPermission.into());
     }
 
@@ -185,11 +211,19 @@ pub async fn delete_recipient(
     Path(recipient_email): Path<String>,
 ) -> Result<StatusCode, AppError> {
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageRecipient).await {
+        log_permission_denied(&user, "delete_recipient", "global:manage_recipient", None);
         return Err(ErrorList::NoManageRecipientPermission.into());
     }
-    sqlx::query!("DELETE FROM recipients WHERE email = $1", recipient_email)
+    let result = sqlx::query!("DELETE FROM recipients WHERE email = $1", &recipient_email)
         .execute(&state.db_connection_pool)
         .await?;
+    event!(
+        Level::INFO,
+        user_email = %user.email,
+        recipient_email,
+        deleted_count = result.rows_affected(),
+        "Recipient deleted"
+    );
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -211,6 +245,7 @@ pub async fn create_list(
     Json(create_list): Json<NewList>,
 ) -> Result<Json<List>, AppError> {
     if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageList).await {
+        log_permission_denied(&user, "create_list", "global:manage_list", None);
         return Err(ErrorList::NoManageListPermission.into());
     }
 
@@ -227,12 +262,19 @@ pub async fn create_list(
     sqlx::query!(
         "INSERT INTO list_user_permissions (list_id, user_email, permission) VALUES ($1, $2, 'read'), ($1, $2, 'write'), ($1, $2, 'send'), ($1, $2, 'change_permission')",
         id,
-        user.email
+        &user.email
     )
     .execute(&mut *tx)
     .await?;
 
     tx.commit().await?;
+    event!(
+        Level::INFO,
+        user_email = %user.email,
+        list_id = id,
+        list_name = %create_list.name,
+        "List created"
+    );
 
     Ok(Json(List {
         id,
@@ -250,10 +292,14 @@ pub async fn get_list_by_id(
         List,
         "SELECT id, name, description FROM LISTS WHERE id = $1 and id in (select list_id from list_user_permissions where permission = 'read' and user_email = $2)",
         id,
-        user.email
+        &user.email
     )
     .fetch_optional(&state.db_connection_pool)
-    .await?.ok_or(ErrorList::ListNotFoundOrNoPermission)?;
+    .await?;
+    let Some(list) = list else {
+        log_permission_denied(&user, "get_list_by_id", "list:read", Some(id));
+        return Err(ErrorList::ListNotFoundOrNoPermission.into());
+    };
 
     let recipients = sqlx::query_as!(
         Recipient,
@@ -307,6 +353,7 @@ pub async fn send_email_to_list(
         let server_url = state.config.server.server_url.clone();
         let hmac_secret = state.config.server.hmac_secret.clone().unwrap_or_default();
 
+        let recipient_count = recipients.len();
         for recipient in recipients {
             let body = if server_url.is_empty() || hmac_secret.is_empty() {
                 payload.body.clone()
@@ -328,9 +375,17 @@ pub async fn send_email_to_list(
             };
             send_email(state.clone(), email).await?;
         }
+        event!(
+            Level::INFO,
+            user_email = %user.email,
+            list_id = id,
+            recipient_count,
+            "Email sent to list"
+        );
 
         Ok(StatusCode::NO_CONTENT)
     } else {
+        log_permission_denied(&user, "send_email_to_list", "list:send", Some(id));
         Err(ErrorList::Unauthorised.into())
     }
 }
@@ -342,15 +397,24 @@ pub async fn delete_from_list(
     Json(recipient_ids): Json<Vec<i32>>,
 ) -> Result<StatusCode, AppError> {
     if user_has_list_permission(&user, state.clone(), id, ListPermission::Write).await {
-        sqlx::query!(
+        let result = sqlx::query!(
             "DELETE FROM lists_to_recipients WHERE list_id = $1 AND recipient_id = ANY($2)",
             id,
             &recipient_ids
         )
         .execute(&state.db_connection_pool)
         .await?;
+        event!(
+            Level::INFO,
+            user_email = %user.email,
+            list_id = id,
+            requested_count = recipient_ids.len(),
+            deleted_count = result.rows_affected(),
+            "Recipients removed from list"
+        );
         Ok(StatusCode::NO_CONTENT)
     } else {
+        log_permission_denied(&user, "delete_from_list", "list:write", Some(id));
         Err(ErrorList::NoWritePermission.into())
     }
 }
@@ -362,7 +426,7 @@ pub async fn add_to_list(
     Json(recipient_ids): Json<Vec<i32>>,
 ) -> Result<StatusCode, AppError> {
     if user_has_list_permission(&user, state.clone(), id, ListPermission::Write).await {
-        sqlx::query!(
+        let result = sqlx::query!(
             "INSERT INTO lists_to_recipients (list_id, recipient_id)
             SELECT $1,recipient_id FROM UNNEST($2::integer[]) AS t(recipient_id)
             ON CONFLICT (list_id, recipient_id) DO NOTHING",
@@ -371,8 +435,17 @@ pub async fn add_to_list(
         )
         .execute(&state.db_connection_pool)
         .await?;
+        event!(
+            Level::INFO,
+            user_email = %user.email,
+            list_id = id,
+            requested_count = recipient_ids.len(),
+            inserted_count = result.rows_affected(),
+            "Recipients added to list"
+        );
         Ok(StatusCode::NO_CONTENT)
     } else {
+        log_permission_denied(&user, "add_to_list", "list:write", Some(id));
         Err(ErrorList::NoWritePermission.into())
     }
 }
@@ -384,6 +457,7 @@ pub async fn get_available_recipients(
     Path(id): Path<i32>,
 ) -> Result<Json<Vec<Recipient>>, AppError> {
     if !user_has_list_permission(&user, state.clone(), id, ListPermission::Write).await {
+        log_permission_denied(&user, "get_available_recipients", "list:write", Some(id));
         return Err(ErrorList::NoWritePermission.into());
     }
 
@@ -408,11 +482,19 @@ pub async fn delete_list(
     Path(id): Path<i32>,
 ) -> Result<StatusCode, AppError> {
     if user_has_global_permission(&user, state.clone(), GlobalPermission::ManageList).await {
-        sqlx::query!("DELETE FROM lists WHERE id = $1", id)
+        let result = sqlx::query!("DELETE FROM lists WHERE id = $1", id)
             .execute(&state.db_connection_pool)
             .await?;
+        event!(
+            Level::INFO,
+            user_email = %user.email,
+            list_id = id,
+            deleted_count = result.rows_affected(),
+            "List deleted"
+        );
         Ok(StatusCode::NO_CONTENT)
     } else {
+        log_permission_denied(&user, "delete_list", "global:manage_list", Some(id));
         Err(ErrorList::NoManageListPermission.into())
     }
 }
@@ -423,6 +505,7 @@ pub async fn get_list_permissions(
     Path(id): Path<i32>,
 ) -> Result<Json<Vec<UserPermission>>, AppError> {
     if !user_has_list_permission(&user, state.clone(), id, ListPermission::_Read).await {
+        log_permission_denied(&user, "get_list_permissions", "list:read", Some(id));
         return Err(ErrorList::ListNotFoundOrNoPermission.into());
     }
 
@@ -453,7 +536,7 @@ pub async fn add_list_permissions(
             .map(|p| p.permission.clone())
             .collect::<Vec<_>>();
 
-        sqlx::query!(
+        let result = sqlx::query!(
             "INSERT INTO list_user_permissions (list_id,user_email, permission)
             SELECT $1,user_email,permission FROM UNNEST($2::text[], $3::text[]) AS t(user_email, permission)",
             id,
@@ -462,8 +545,22 @@ pub async fn add_list_permissions(
         )
         .execute(&state.db_connection_pool)
         .await?;
+        event!(
+            Level::INFO,
+            user_email = %user.email,
+            list_id = id,
+            changes = ?payload,
+            inserted_count = result.rows_affected(),
+            "List permissions granted"
+        );
         Ok(StatusCode::NO_CONTENT)
     } else {
+        log_permission_denied(
+            &user,
+            "add_list_permissions",
+            "list:change_permission",
+            Some(id),
+        );
         Err(ErrorList::NoWritePermission.into())
     }
 }
@@ -484,7 +581,7 @@ pub async fn delete_list_permissions(
             .map(|p| p.permission.clone())
             .collect::<Vec<_>>();
 
-        sqlx::query!(
+        let result = sqlx::query!(
             "DELETE FROM list_user_permissions WHERE list_id = $1 AND (user_email,permission) IN((
             SELECT user_email,permission FROM UNNEST($2::text[], $3::text[]) AS t(user_email, permission)))",
             id,
@@ -493,8 +590,22 @@ pub async fn delete_list_permissions(
         )
         .execute(&state.db_connection_pool)
         .await?;
+        event!(
+            Level::INFO,
+            user_email = %user.email,
+            list_id = id,
+            changes = ?payload,
+            deleted_count = result.rows_affected(),
+            "List permissions revoked"
+        );
         Ok(StatusCode::NO_CONTENT)
     } else {
+        log_permission_denied(
+            &user,
+            "delete_list_permissions",
+            "list:change_permission",
+            Some(id),
+        );
         Err(ErrorList::NoWritePermission.into())
     }
 }
@@ -514,7 +625,7 @@ pub async fn add_global_permissions(
             .map(|p| p.permission.clone())
             .collect::<Vec<_>>();
 
-        sqlx::query!(
+        let result = sqlx::query!(
             "INSERT INTO global_user_permissions (user_email, permission)
             SELECT user_email,permission FROM UNNEST($1::text[], $2::text[]) AS t(user_email, permission)",
             &user_emails,
@@ -522,8 +633,21 @@ pub async fn add_global_permissions(
         )
         .execute(&state.db_connection_pool)
         .await?;
+        event!(
+            Level::INFO,
+            user_email = %user.email,
+            changes = ?payload,
+            inserted_count = result.rows_affected(),
+            "Global permissions granted"
+        );
         Ok(StatusCode::NO_CONTENT)
     } else {
+        log_permission_denied(
+            &user,
+            "add_global_permissions",
+            "global:change_permission",
+            None,
+        );
         Err(ErrorList::NoManageGlobalPermission.into())
     }
 }
@@ -543,7 +667,7 @@ pub async fn delete_global_permissions(
             .map(|p| p.permission.clone())
             .collect::<Vec<_>>();
 
-        sqlx::query!(
+        let result = sqlx::query!(
             "DELETE FROM global_user_permissions WHERE (user_email,permission) IN((
             SELECT user_email,permission FROM UNNEST($1::text[], $2::text[]) AS t(user_email, permission)))",
             &user_emails,
@@ -551,8 +675,21 @@ pub async fn delete_global_permissions(
         )
         .execute(&state.db_connection_pool)
         .await?;
+        event!(
+            Level::INFO,
+            user_email = %user.email,
+            changes = ?payload,
+            deleted_count = result.rows_affected(),
+            "Global permissions revoked"
+        );
         Ok(StatusCode::NO_CONTENT)
     } else {
+        log_permission_denied(
+            &user,
+            "delete_global_permissions",
+            "global:change_permission",
+            None,
+        );
         Err(ErrorList::NoManageGlobalPermission.into())
     }
 }
@@ -597,11 +734,25 @@ pub async fn unsubscribe(
         &payload.unsubscribe_text,
         &payload.unsubscribe_signature,
         &hmac_secret,
-    )?;
+    )
+    .map_err(|error| {
+        event!(
+            Level::WARN,
+            reason = %error,
+            "Rejected unsubscribe request"
+        );
+        error
+    })?;
 
-    sqlx::query!("DELETE FROM recipients WHERE email = $1", email)
+    let result = sqlx::query!("DELETE FROM recipients WHERE email = $1", &email)
         .execute(&state.db_connection_pool)
         .await?;
+    event!(
+        Level::INFO,
+        recipient_email = %email,
+        deleted_count = result.rows_affected(),
+        "Recipient unsubscribed"
+    );
 
     Ok(StatusCode::NO_CONTENT)
 }

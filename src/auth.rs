@@ -112,11 +112,13 @@ pub async fn create_registration(
     state: Arc<AppState>,
     identity_provider: IdentityProvider,
 ) -> Result<User, AppError> {
+    let identity_provider_name = String::from(identity_provider.clone());
     event!(
         Level::INFO,
-        "Attempting to create registration for email {} and username {}",
-        registration_details.email,
-        registration_details.username
+        email = %registration_details.email,
+        username = %registration_details.username,
+        identity_provider = %identity_provider_name,
+        "Attempting to create registration"
     );
 
     let hashed_password = hash_password(&registration_details.password);
@@ -143,6 +145,13 @@ pub async fn create_registration(
     .bind(String::from(identity_provider.clone()))
     .execute(&state.db_connection_pool).await?
     };
+    event!(
+        Level::INFO,
+        email = %registration_details.email,
+        username = %registration_details.username,
+        identity_provider = %identity_provider_name,
+        "Registration created"
+    );
     Ok(User {
         username: registration_details.username.clone(),
         email: registration_details.email.clone(),

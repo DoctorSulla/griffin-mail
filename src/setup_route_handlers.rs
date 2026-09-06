@@ -10,6 +10,7 @@ use axum::{Json, extract::State};
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::{Level, event};
 
 const ADMIN_PERMISSIONS: [&str; 3] = ["manage_list", "manage_recipient", "change_permission"];
 
@@ -57,6 +58,11 @@ pub async fn create_administrator(
 
     // Avoid an expensive password hash once setup has already completed.
     if administrator_exists(&state.db_connection_pool).await? {
+        event!(
+            Level::WARN,
+            email = %details.email,
+            "Rejected administrator registration because setup is complete"
+        );
         return Err(ErrorList::AdministratorAlreadyConfigured.into());
     }
 
@@ -70,6 +76,11 @@ pub async fn create_administrator(
         .await?;
 
     if administrator_exists(&mut *transaction).await? {
+        event!(
+            Level::WARN,
+            email = %details.email,
+            "Rejected concurrent administrator registration because setup completed"
+        );
         return Err(ErrorList::AdministratorAlreadyConfigured.into());
     }
 
@@ -113,6 +124,13 @@ pub async fn create_administrator(
     .await?;
 
     transaction.commit().await?;
+    event!(
+        Level::INFO,
+        email = %details.email,
+        username = %details.username,
+        permissions = ?ADMIN_PERMISSIONS,
+        "Administrator account created"
+    );
 
     Ok(Json(ApiResponse {
         response_type: ResponseType::SetupSuccess,
