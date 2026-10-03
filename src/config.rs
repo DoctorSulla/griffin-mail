@@ -79,6 +79,8 @@ pub struct ServerConfig {
     pub google_client_id: String,
     pub server_url: String,
     pub hmac_secret: Option<String>,
+    pub no_reply_email: String,
+    pub registration_email: String,
 }
 
 #[derive(Deserialize, Clone)]

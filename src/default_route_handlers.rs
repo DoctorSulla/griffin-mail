@@ -549,7 +549,10 @@ pub async fn change_password(
     tx.commit().await?;
 
     let mut headers = HeaderMap::new();
-    headers.insert(SET_COOKIE, expired_session_cookie().to_string().parse()?);
+    headers.insert(
+        SET_COOKIE,
+        expired_session_cookie(state).to_string().parse()?,
+    );
 
     Ok((
         headers,
@@ -581,7 +584,7 @@ pub async fn password_reset_initiate(
     // Send email
     let email = Email {
         to: user.email.clone(),
-        from: "registration@tld.com".to_string(),
+        from: "registration@wltc.club".to_string(),
         subject: "Password Reset".to_string(),
         body: format!(
             "<p>A password reset was requested for your account.</p> \
@@ -642,7 +645,10 @@ pub async fn password_reset_complete(
     tx.commit().await?;
 
     let mut headers = HeaderMap::new();
-    headers.insert(SET_COOKIE, expired_session_cookie().to_string().parse()?);
+    headers.insert(
+        SET_COOKIE,
+        expired_session_cookie(state).to_string().parse()?,
+    );
 
     Ok((
         headers,
@@ -671,7 +677,7 @@ pub async fn logout(State(state): State<Arc<AppState>>, user: User) -> Result<He
     let mut headers = HeaderMap::new();
     headers.insert(
         header::SET_COOKIE,
-        expired_session_cookie().to_string().parse()?,
+        expired_session_cookie(state).to_string().parse()?,
     );
     Ok(headers)
 }

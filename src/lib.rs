@@ -58,7 +58,7 @@ pub async fn start_app() {
 
     let app = get_app(app_state.clone());
 
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", app_state.config.server.port))
+    let listener = tokio::net::TcpListener::bind(("0.0.0.0", app_state.config.server.port))
         .await
         .unwrap();
     let _ = axum::serve(listener, app).await;

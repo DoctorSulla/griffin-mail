@@ -1,4 +1,4 @@
 #!/bin/bash
-app_name=axumatic
+app_name="griffin-mail"
 pkill $app_name
 cargo run &

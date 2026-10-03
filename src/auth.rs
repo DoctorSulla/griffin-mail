@@ -1,4 +1,5 @@
 use crate::AppState;
+use crate::RuntimeEnvironment;
 use crate::config::AuthLevel;
 use crate::default_route_handlers::{
     AppError, CodeType, ErrorList, RegistrationDetails, UserEmail,
@@ -77,7 +78,10 @@ pub async fn create_session(user: &User, state: Arc<AppState>) -> Result<Cookie<
     let session_cookie = Cookie::build(("session-key", session_key.clone()))
         .max_age(Duration::days(state.config.server.session_length_in_days))
         .path("/")
-        .secure(true)
+        .secure(matches!(
+            state.config.environment,
+            RuntimeEnvironment::Production
+        ))
         .http_only(true)
         .same_site(SameSite::Lax)
         .build();
@@ -97,11 +101,14 @@ pub async fn create_session(user: &User, state: Arc<AppState>) -> Result<Cookie<
     Ok(session_cookie)
 }
 
-pub fn expired_session_cookie() -> Cookie<'static> {
+pub fn expired_session_cookie(state: Arc<AppState>) -> Cookie<'static> {
     Cookie::build(("session-key", ""))
         .max_age(Duration::seconds(0))
         .path("/")
-        .secure(true)
+        .secure(matches!(
+            state.config.environment,
+            RuntimeEnvironment::Production
+        ))
         .http_only(true)
         .same_site(SameSite::Lax)
         .build()
@@ -178,7 +185,7 @@ pub async fn send_verification_email(user: &User, state: Arc<AppState>) -> Resul
 
     let email = Email {
         to,
-        from: "registration@tld.com".to_string(),
+        from: "registration@wltc.club".to_string(),
         subject: "Verify your email".to_string(),
         body: format!(
             "<p>Thank you for registering.</p> <p>Please verify for your email using the following code {code}. Your code is valid for 1 hour.</p>"

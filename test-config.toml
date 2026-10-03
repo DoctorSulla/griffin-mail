@@ -1,13 +1,13 @@
 [database]
-username = "postgres"
-connection_url = "localhost/postgres"
+username = "neondb_owner"
+connection_url = "ep-square-silence-za1fdyil-pooler.c-2.eu-west-2.aws.neon.tech/neondb"
 pool_size = 20
 
 [email]
-server_url = ""
-username = ""
-pool_size = 20
-send_emails = false
+server_url = "email-smtp.eu-west-1.amazonaws.com"
+username = "AKIATOSJGMA4RZNDCBFJ"
+pool_size = 5
+send_emails = true
 
 [server]
 request_timeout = 5
@@ -16,3 +16,5 @@ max_unsuccessful_login_attempts = 10
 session_length_in_days = 180
 google_client_id = "988343938519-vle7kps2l5f6cdnjluibda25o66h2jpn.apps.googleusercontent.com"
 server_url = "http://localhost:3000"
+no_reply_email = ""
+registration_email = ""
