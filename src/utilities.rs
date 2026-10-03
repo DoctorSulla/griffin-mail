@@ -35,7 +35,7 @@ pub async fn send_email(state: Arc<AppState>, email: Email) -> Result<(), anyhow
             .reply_to(
                 email
                     .reply_to
-                    .unwrap_or_else(|| String::from("no-reply@wltc.club"))
+                    .unwrap_or_else(|| state.config.server.no_reply_email.clone())
                     .parse()?,
             )
             .header(ContentType::TEXT_HTML)

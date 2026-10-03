@@ -185,7 +185,7 @@ pub async fn send_verification_email(user: &User, state: Arc<AppState>) -> Resul
 
     let email = Email {
         to,
-        from: "registration@wltc.club".to_string(),
+        from: state.config.server.registration_email.clone(),
         subject: "Verify your email".to_string(),
         body: format!(
             "<p>Thank you for registering.</p> <p>Please verify for your email using the following code {code}. Your code is valid for 1 hour.</p>"

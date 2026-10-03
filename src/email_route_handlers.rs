@@ -51,20 +51,10 @@ impl From<GlobalPermission> for String {
     }
 }
 
-fn log_permission_denied(
-    user: &User,
-    operation: &str,
-    required_permission: &str,
-    list_id: Option<i32>,
-) {
-    event!(
-        Level::WARN,
-        user_email = %user.email,
-        operation,
-        required_permission,
-        ?list_id,
-        "Permission denied"
-    );
+#[derive(Debug, Clone, Deserialize)]
+pub struct UnsubscribeRequest {
+    unsubscribe_text: String,
+    unsubscribe_signature: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -111,6 +101,22 @@ pub struct ListEmailRequest {
     pub body: String,
     pub from: Option<String>,
     pub reply_to: Option<String>,
+}
+
+fn log_permission_denied(
+    user: &User,
+    operation: &str,
+    required_permission: &str,
+    list_id: Option<i32>,
+) {
+    event!(
+        Level::WARN,
+        user_email = %user.email,
+        operation,
+        required_permission,
+        ?list_id,
+        "Permission denied"
+    );
 }
 
 async fn user_has_list_permission(
@@ -757,12 +763,6 @@ pub async fn unsubscribe(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct UnsubscribeRequest {
-    unsubscribe_text: String,
-    unsubscribe_signature: String,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -799,6 +799,8 @@ mod tests {
                     google_client_id: String::new(),
                     server_url: String::new(),
                     hmac_secret: Some(TEST_HMAC_SECRET.to_string()),
+                    registration_email: String::from("registration@tld.com"),
+                    no_reply_email: String::from("no-reply@tld.com"),
                 },
                 database: DatabaseConfig {
                     pool_size: 1,
@@ -927,7 +929,7 @@ mod tests {
 
         let denied = create_list(
             State(state.clone()),
-            test_user("creator@example.com"),
+            VerifiedEmailUser(test_user("creator@example.com")),
             Json(NewList {
                 name: "denied".to_string(),
                 description: String::new(),
@@ -958,7 +960,7 @@ mod tests {
         let Json(created) = expect_ok(
             create_list(
                 State(state),
-                user,
+                VerifiedEmailUser(user),
                 Json(NewList {
                     name: "allowed".to_string(),
                     description: "description".to_string(),
@@ -1005,9 +1007,14 @@ mod tests {
         .await
         .unwrap();
 
-        let Json(lists) =
-            expect_ok(get_lists(State(test_state(pool)), test_user("reader@example.com")).await)
-                .await;
+        let Json(lists) = expect_ok(
+            get_lists(
+                State(test_state(pool)),
+                VerifiedEmailUser(test_user("reader@example.com")),
+            )
+            .await,
+        )
+        .await;
 
         assert_eq!(lists.len(), 1);
         assert_eq!(lists[0].id, visible_list);

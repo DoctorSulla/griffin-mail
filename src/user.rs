@@ -28,7 +28,7 @@ pub struct User {
 }
 
 /// A user whose email address is verified and can therefore exercise permissions.
-pub struct VerifiedEmailUser(User);
+pub struct VerifiedEmailUser(pub User);
 
 impl Deref for VerifiedEmailUser {
     type Target = User;
