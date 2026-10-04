@@ -83,6 +83,7 @@ pub fn get_email_routes() -> Router<Arc<AppState>> {
             "/email/users/permissions",
             delete(email_route_handlers::delete_global_permissions),
         )
+        .route("/email/mdToHtml", post(email_route_handlers::md_to_html))
 }
 
 pub fn get_open_routes() -> Router<Arc<AppState>> {

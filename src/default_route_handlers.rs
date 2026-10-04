@@ -125,6 +125,8 @@ pub enum ErrorList {
     UnsubscribeLinkExpired,
     #[error("An administrator account has already been configured")]
     AdministratorAlreadyConfigured,
+    #[error("Maximum markdown length exceeded")]
+    MarkdownTooLong,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
