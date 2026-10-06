@@ -357,7 +357,13 @@ async fn test_max_length_md() {
         long_string.push_str("a");
         i += 1;
     }
-    assert!(md_to_html(long_string).await.is_ok())
+    assert!(
+        md_to_html(Json(Markdown {
+            markdown: long_string
+        }))
+        .await
+        .is_ok()
+    )
 }
 
 #[tokio::test]
@@ -368,5 +374,11 @@ async fn test_exceeded_max_length_md() {
         long_string.push_str("a");
         i += 1;
     }
-    assert!(md_to_html(long_string).await.is_err())
+    assert!(
+        md_to_html(Json(Markdown {
+            markdown: long_string
+        }))
+        .await
+        .is_err()
+    )
 }

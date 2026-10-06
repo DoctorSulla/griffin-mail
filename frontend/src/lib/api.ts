@@ -2,6 +2,10 @@ import { dev } from '$app/environment';
 
 const API_BASE_URL = dev ? 'http://localhost:3000' : '';
 
+export interface Markdown {
+    markdown: string;
+}
+
 export interface Recipient {
 	id?: number;
 	name: string;
@@ -272,6 +276,10 @@ export const api = {
 
 	async deleteGlobalPermissions(permissions: UserPermission[]): Promise<ResourceResult> {
 		return resourceCall('/email/users/permissions', 'DELETE', permissions);
+    },
+
+    async getEmailPreview(emailBody: Markdown): Promise<ResourceResult> {
+		return resourceCall('/email/mdToHtml', 'POST', emailBody);
 	},
 
 	async unsubscribe(

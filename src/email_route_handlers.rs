@@ -103,6 +103,16 @@ pub struct ListEmailRequest {
     pub reply_to: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EmailPreview {
+    pub html: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Markdown {
+    pub markdown: String,
+}
+
 fn log_permission_denied(
     user: &User,
     operation: &str,
@@ -763,11 +773,15 @@ pub async fn unsubscribe(
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn md_to_html(body: String) -> Result<(StatusCode, String), AppError> {
-    if body.len() > 100000 {
+pub async fn md_to_html(
+    body: Json<Markdown>,
+) -> Result<(StatusCode, Json<EmailPreview>), AppError> {
+    if body.markdown.len() > 100000 {
         return Err(ErrorList::MarkdownTooLong.into());
     }
-    Ok((StatusCode::OK, markdown::to_html(&body)))
+    let html = markdown::to_html(&body.markdown);
+
+    Ok((StatusCode::OK, Json(EmailPreview { html })))
 }
 
 #[cfg(test)]

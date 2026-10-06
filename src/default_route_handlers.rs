@@ -148,6 +148,7 @@ pub enum ResponseType {
     Nonce,
     ResendVerificationEmailSuccess,
     SetupSuccess,
+    Html,
 }
 
 impl From<ResponseType> for String {
@@ -168,6 +169,7 @@ impl From<ResponseType> for String {
                 "ResendVerificationEmailSuccess".to_string()
             }
             ResponseType::SetupSuccess => "SetupSuccess".to_string(),
+            ResponseType::Html => "Html".to_string(),
         }
     }
 }
