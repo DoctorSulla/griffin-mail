@@ -21,6 +21,10 @@
 	let availableMessage = $state('');
 	let permissionMessage = $state('');
 	let emailPreview = $state('');
+	let emailView = $state<'raw' | 'preview'>('raw');
+	let previewLoading = $state(false);
+	let previewError = $state('');
+	let previewRequest = 0;
 
 	let email = $state({ subject: '', body: '', from: '', reply_to: '' });
 	let permissionEmail = $state('');
@@ -90,6 +94,11 @@
 
 	async function sendEmail(event: SubmitEvent) {
 		event.preventDefault();
+		if (!email.body.trim()) {
+			selectEmailView('raw');
+			error = 'A message is required.';
+			return;
+		}
 		if (!confirm(`Send this email to all ${details?.recipients.length ?? 0} recipients?`)) return;
 		const result = await api.sendEmailToList(listId, {
 			subject: email.subject,
@@ -98,7 +107,10 @@
 			reply_to: email.reply_to || undefined
 		});
 		showResult(result, 'Email sent to the list.');
-		if (result.ok) email = { subject: '', body: '', from: '', reply_to: '' };
+		if (result.ok) {
+			email = { subject: '', body: '', from: '', reply_to: '' };
+			selectEmailView('raw');
+		}
 	}
 
 	async function grantPermission(event: SubmitEvent) {
@@ -126,16 +138,44 @@
 		else showResult(result, '');
 	}
 
-	async function showPreview() {
-	  const result = await api.getEmailPreview({ markdown: email.body});
-	  emailPreview = result.data.html || '';
+	function selectEmailView(view: 'raw' | 'preview') {
+		emailView = view;
+		// Invalidate requests when leaving the preview or starting a new one.
+		previewRequest += 1;
+		emailPreview = '';
+		previewError = '';
+		previewLoading = false;
+		if (view === 'preview' && email.body.trim()) void showPreview(previewRequest);
+	}
+
+	async function showPreview(request: number) {
+		const markdown = email.body;
+		previewLoading = true;
+		const result = await api.getEmailPreview({ markdown });
+		if (request !== previewRequest || markdown !== email.body) return;
+		previewLoading = false;
+		if (result.ok && typeof result.data?.html === 'string') {
+			emailPreview = result.data.html;
+		} else {
+			previewError = result.message || 'Could not render the preview. Please try again.';
+		}
+	}
+
+	function handleTabKey(event: KeyboardEvent) {
+		let view: 'raw' | 'preview';
+		if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+			view = emailView === 'raw' ? 'preview' : 'raw';
+		} else if (event.key === 'Home') {
+			view = 'raw';
+		} else if (event.key === 'End') {
+			view = 'preview';
+		} else return;
+		event.preventDefault();
+		selectEmailView(view);
+		document.getElementById(`email-${view}-tab`)?.focus();
 	}
 </script>
-<style>
-    #email-preview :global(h1) { font-size:24px }
-    #email-preview :global(h2) { font-size:20px }
-    #email-preview :global(h3) { font-size:16px }
-</style>
+
 <div class="py-8">
 	<a class="text-sm font-medium text-blue-600 hover:text-blue-800" href="/lists">← All lists</a>
 
@@ -218,14 +258,73 @@
 						placeholder="Subject"
 						class="w-full rounded-md border border-gray-300 px-3 py-2"
 					/>
-					<textarea
-						required
-						rows="7"
-						bind:value={email.body}
-						placeholder="Message"
-						class="w-full rounded-md border border-gray-300 px-3 py-2"
-						onkeyup={showPreview}
-					></textarea>
+					<div>
+						<div
+							role="tablist"
+							aria-label="Message view"
+							class="mb-2 flex border-b border-gray-200"
+						>
+							{#each ['raw', 'preview'] as view}
+								<button
+									type="button"
+									role="tab"
+									id={`email-${view}-tab`}
+									aria-selected={emailView === view}
+									aria-controls={`email-${view}-panel`}
+									tabindex={emailView === view ? 0 : -1}
+									onclick={() => selectEmailView(view === 'raw' ? 'raw' : 'preview')}
+									onkeydown={handleTabKey}
+									class="border-b-2 px-4 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 {emailView ===
+									view
+										? 'border-blue-600 text-blue-700'
+										: 'border-transparent text-gray-600 hover:text-gray-900'}"
+								>
+									{view === 'raw' ? 'Raw Markdown' : 'Preview'}
+								</button>
+							{/each}
+						</div>
+						<div
+							id="email-raw-panel"
+							role="tabpanel"
+							aria-labelledby="email-raw-tab"
+							hidden={emailView !== 'raw'}
+						>
+							<textarea
+								required={emailView === 'raw'}
+								rows="7"
+								bind:value={email.body}
+								aria-label="Message in Markdown"
+								placeholder="Message (Markdown supported)"
+								class="w-full rounded-md border border-gray-300 px-3 py-2"
+							></textarea>
+						</div>
+						<div
+							id="email-preview-panel"
+							role="tabpanel"
+							aria-labelledby="email-preview-tab"
+							aria-busy={previewLoading}
+							tabindex="0"
+							hidden={emailView !== 'preview'}
+							class="min-h-48 rounded-md border border-gray-300 p-3"
+						>
+							{#if previewLoading}
+								<p role="status" class="text-sm text-gray-500">Rendering preview…</p>
+							{:else if previewError}
+								<p role="alert" class="text-sm text-red-700">{previewError}</p>
+								<button
+									type="button"
+									onclick={() => selectEmailView('preview')}
+									class="mt-2 text-sm font-medium text-blue-600 underline">Retry preview</button
+								>
+							{:else if !email.body.trim()}
+								<p class="text-sm text-gray-500">
+									Write a message in the Raw Markdown tab to preview it.
+								</p>
+							{:else}
+								<div id="email-preview">{@html emailPreview}</div>
+							{/if}
+						</div>
+					</div>
 					<div class="grid gap-3 sm:grid-cols-2">
 						<input
 							type="email"
@@ -245,9 +344,6 @@
 					</button>
 				</div>
 			</form>
-			<div id="email-preview">
-			{@html emailPreview}
-			</div>
 
 			<section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
 				<h2 class="text-xl font-semibold text-gray-900">List permissions</h2>
@@ -292,3 +388,148 @@
 		<div class="mt-6"><Feedback {error} /></div>
 	{/if}
 </div>
+
+<style>
+	/* Tailwind's reset removes Markdown defaults; keep these styles inside the preview. */
+	#email-preview {
+		color: #1f2937;
+		line-height: 1.65;
+		overflow-x: auto;
+		overflow-wrap: anywhere;
+	}
+
+	#email-preview :global(h1),
+	#email-preview :global(h2),
+	#email-preview :global(h3),
+	#email-preview :global(h4),
+	#email-preview :global(h5),
+	#email-preview :global(h6) {
+		margin: 1.25em 0 0.5em;
+		font-weight: 600;
+		line-height: 1.3;
+	}
+
+	#email-preview :global(h1) {
+		font-size: 24px;
+	}
+	#email-preview :global(h2) {
+		font-size: 20px;
+	}
+	#email-preview :global(h3) {
+		font-size: 16px;
+	}
+	#email-preview :global(h4) {
+		font-size: 15px;
+	}
+	#email-preview :global(h5),
+	#email-preview :global(h6) {
+		font-size: 14px;
+	}
+
+	#email-preview :global(p),
+	#email-preview :global(ul),
+	#email-preview :global(ol),
+	#email-preview :global(blockquote),
+	#email-preview :global(pre),
+	#email-preview :global(table) {
+		margin: 0.75em 0;
+	}
+
+	#email-preview :global(ul) {
+		list-style-type: disc;
+		padding-left: 1.5em;
+	}
+	#email-preview :global(ol) {
+		list-style-type: decimal;
+		padding-left: 1.5em;
+	}
+	#email-preview :global(ul ul) {
+		list-style-type: circle;
+	}
+	#email-preview :global(ul ul ul) {
+		list-style-type: square;
+	}
+	#email-preview :global(li) {
+		margin: 0.25em 0;
+	}
+	#email-preview :global(li > ul),
+	#email-preview :global(li > ol) {
+		margin: 0.25em 0;
+	}
+
+	#email-preview :global(a) {
+		color: #2563eb;
+		text-decoration: underline;
+	}
+	#email-preview :global(a:hover) {
+		color: #1e40af;
+	}
+	#email-preview :global(strong) {
+		font-weight: 700;
+	}
+	#email-preview :global(em) {
+		font-style: italic;
+	}
+	#email-preview :global(del) {
+		text-decoration: line-through;
+	}
+
+	#email-preview :global(blockquote) {
+		border-left: 4px solid #d1d5db;
+		padding: 0.25em 1em;
+		color: #4b5563;
+		background: #f9fafb;
+	}
+
+	#email-preview :global(code) {
+		border-radius: 0.25rem;
+		padding: 0.15em 0.35em;
+		background: #f3f4f6;
+		font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+		font-size: 0.875em;
+	}
+
+	#email-preview :global(pre) {
+		overflow-x: auto;
+		border-radius: 0.375rem;
+		padding: 1em;
+		background: #f3f4f6;
+		line-height: 1.5;
+	}
+
+	#email-preview :global(pre code) {
+		padding: 0;
+		background: transparent;
+	}
+	#email-preview :global(hr) {
+		margin: 1.5em 0;
+		border-top: 1px solid #d1d5db;
+	}
+	#email-preview :global(img) {
+		max-width: 100%;
+		height: auto;
+		margin: 0.75em 0;
+	}
+	#email-preview :global(table) {
+		border-collapse: collapse;
+		font-size: 0.875em;
+	}
+	#email-preview :global(th),
+	#email-preview :global(td) {
+		border: 1px solid #d1d5db;
+		padding: 0.5em 0.75em;
+	}
+	#email-preview :global(th) {
+		background: #f3f4f6;
+		font-weight: 600;
+	}
+	#email-preview :global(tbody tr:nth-child(even)) {
+		background: #f9fafb;
+	}
+	#email-preview :global(> :first-child) {
+		margin-top: 0;
+	}
+	#email-preview :global(> :last-child) {
+		margin-bottom: 0;
+	}
+</style>

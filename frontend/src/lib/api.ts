@@ -3,7 +3,11 @@ import { dev } from '$app/environment';
 const API_BASE_URL = dev ? 'http://localhost:3000' : '';
 
 export interface Markdown {
-    markdown: string;
+	markdown: string;
+}
+
+export interface EmailPreview {
+	html: string;
 }
 
 export interface Recipient {
@@ -276,9 +280,9 @@ export const api = {
 
 	async deleteGlobalPermissions(permissions: UserPermission[]): Promise<ResourceResult> {
 		return resourceCall('/email/users/permissions', 'DELETE', permissions);
-    },
+	},
 
-    async getEmailPreview(emailBody: Markdown): Promise<ResourceResult> {
+	async getEmailPreview(emailBody: Markdown): Promise<ResourceResult<EmailPreview>> {
 		return resourceCall('/email/mdToHtml', 'POST', emailBody);
 	},
 
