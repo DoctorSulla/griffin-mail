@@ -30,21 +30,19 @@ pub async fn send_email(state: Arc<AppState>, email: Email) -> Result<(), anyhow
     }
 
     if state.config.email.send_emails {
-        let email = Message::builder()
-            .from(email.from.parse()?)
-            .reply_to(
-                email
-                    .reply_to
-                    .unwrap_or_else(|| state.config.server.no_reply_email.clone())
-                    .parse()?,
-            )
+        let mut message_builder = Message::builder().from(email.from.parse()?);
+
+        if let Some(reply_to) = email.reply_to {
+            message_builder = message_builder.reply_to(reply_to.parse()?);
+        }
+        let message = message_builder
             .header(ContentType::TEXT_HTML)
             .to(email.to.parse()?)
             .subject(email.subject)
             .body(email.body)?;
 
         //Send the email via remote relay
-        state.email_connection_pool.send(&email)?;
+        state.email_connection_pool.send(&message)?;
     }
     Ok(())
 }

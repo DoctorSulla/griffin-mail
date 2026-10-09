@@ -364,16 +364,18 @@ pub async fn send_email_to_list(
 
         let from = payload
             .from
-            .unwrap_or_else(|| state.config.email.username.clone());
+            .unwrap_or_else(|| state.config.server.no_reply_email.clone());
+
+        let reply_to = payload
+            .reply_to
+            .unwrap_or_else(|| state.config.server.no_reply_email.clone());
 
         let server_url = state.config.server.server_url.clone();
         let hmac_secret = state.config.server.hmac_secret.clone().unwrap_or_default();
 
         let recipient_count = recipients.len();
         for recipient in recipients {
-            let body = if server_url.is_empty() || hmac_secret.is_empty() {
-                payload.body.clone()
-            } else {
+            let body = {
                 let unsubscribe_link =
                     generate_unsubscribe_link(&server_url, &recipient.email, &hmac_secret);
                 format!(
@@ -387,7 +389,7 @@ pub async fn send_email_to_list(
                 from: from.clone(),
                 subject: payload.subject.clone(),
                 body,
-                reply_to: payload.reply_to.clone(),
+                reply_to: Some(reply_to.clone()),
             };
             send_email(state.clone(), email).await?;
         }
