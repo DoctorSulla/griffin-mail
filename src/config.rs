@@ -79,8 +79,9 @@ pub struct ServerConfig {
     pub google_client_id: String,
     pub server_url: String,
     pub hmac_secret: Option<String>,
-    pub no_reply_email: String,
-    pub registration_email: String,
+    pub email_tld: String,
+    pub no_reply_email_prefix: String,
+    pub registration_email_prefix: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -184,5 +185,19 @@ impl Config {
         self.database.password = Some(pg_password);
         self.email.password = Some(smtp_password);
         self.server.hmac_secret = Some(hmac_secret);
+    }
+
+    pub fn get_no_reply_email(&self) -> String {
+        format!(
+            "{}{}",
+            self.server.no_reply_email_prefix, self.server.email_tld
+        )
+    }
+
+    pub fn get_registration_email(&self) -> String {
+        format!(
+            "{}{}",
+            self.server.registration_email_prefix, self.server.email_tld
+        )
     }
 }

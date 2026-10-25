@@ -362,13 +362,15 @@ pub async fn send_email_to_list(
         .fetch_all(&state.db_connection_pool)
         .await?;
 
-        let from = payload
-            .from
-            .unwrap_or_else(|| state.config.server.no_reply_email.clone());
+        let from = match payload.from {
+            Some(from) => format!("{}{}", from, state.config.server.email_tld),
+            None => state.config.get_no_reply_email(),
+        };
 
-        let reply_to = payload
-            .reply_to
-            .unwrap_or_else(|| state.config.server.no_reply_email.clone());
+        let reply_to = match payload.reply_to {
+            Some(reply_to) => format!("{}{}", reply_to, state.config.server.email_tld),
+            None => state.config.get_no_reply_email(),
+        };
 
         let server_url = state.config.server.server_url.clone();
         let hmac_secret = state.config.server.hmac_secret.clone().unwrap_or_default();
@@ -735,7 +737,7 @@ fn verify_unsubscribe_signature(
         return Err(ErrorList::InvalidUnsubscribeSignature);
     }
 
-    let expires: i64 = parts[0].parse().unwrap_or_else(|_| 0);
+    let expires: i64 = parts[0].parse().unwrap_or(0);
     if expires > 0 && expires < chrono::Utc::now().timestamp() {
         return Err(ErrorList::UnsubscribeLinkExpired);
     }

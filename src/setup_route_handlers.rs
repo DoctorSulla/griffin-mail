@@ -31,7 +31,7 @@ async fn administrator_exists(
             HAVING COUNT(DISTINCT permission) = 3
         )",
     )
-    .bind(&ADMIN_PERMISSIONS)
+    .bind(ADMIN_PERMISSIONS)
     .fetch_one(executor)
     .await
 }
@@ -119,7 +119,7 @@ pub async fn create_administrator(
          WHERE permission = ANY($2)",
     )
     .bind(&details.email)
-    .bind(&ADMIN_PERMISSIONS)
+    .bind(ADMIN_PERMISSIONS)
     .execute(&mut *transaction)
     .await?;
 

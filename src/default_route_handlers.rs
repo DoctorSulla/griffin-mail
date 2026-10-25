@@ -588,7 +588,7 @@ pub async fn password_reset_initiate(
     // Send email
     let email = Email {
         to: user.email.clone(),
-        from: state.config.server.registration_email.clone(),
+        from: state.config.get_registration_email(),
         subject: "Password Reset".to_string(),
         body: format!(
             "<p>A password reset was requested for your account.</p> \
