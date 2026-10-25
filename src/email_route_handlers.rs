@@ -129,6 +129,11 @@ fn log_permission_denied(
     );
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EmailTld {
+    tld: String,
+}
+
 async fn user_has_list_permission(
     user: &User,
     state: Arc<AppState>,
@@ -363,12 +368,12 @@ pub async fn send_email_to_list(
         .await?;
 
         let from = match payload.from {
-            Some(from) => format!("{}{}", from, state.config.server.email_tld),
+            Some(from) => format!("{}{}", from, state.config.get_email_domain()),
             None => state.config.get_no_reply_email(),
         };
 
         let reply_to = match payload.reply_to {
-            Some(reply_to) => format!("{}{}", reply_to, state.config.server.email_tld),
+            Some(reply_to) => format!("{}{}", reply_to, state.config.get_email_domain()),
             None => state.config.get_no_reply_email(),
         };
 
@@ -786,6 +791,17 @@ pub async fn md_to_html(
     let html = markdown::to_html(&body.markdown);
 
     Ok((StatusCode::OK, Json(EmailPreview { html })))
+}
+
+pub async fn get_email_tld(
+    State(state): State<Arc<AppState>>,
+) -> Result<(StatusCode, Json<EmailTld>), AppError> {
+    Ok((
+        StatusCode::OK,
+        Json(EmailTld {
+            tld: state.config.get_email_domain(),
+        }),
+    ))
 }
 
 #[cfg(test)]

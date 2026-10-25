@@ -16,6 +16,10 @@ export interface Recipient {
 	email: string;
 }
 
+export interface EmailTld {
+	tld: string;
+}
+
 export interface MailingList {
 	id: number;
 	name: string;
@@ -284,6 +288,10 @@ export const api = {
 
 	async getEmailPreview(emailBody: Markdown): Promise<ResourceResult<EmailPreview>> {
 		return resourceCall('/email/mdToHtml', 'POST', emailBody);
+	},
+
+	async getEmailTld(): Promise<ResourceResult<EmailTld>> {
+		return resourceCall('/email/tld');
 	},
 
 	async unsubscribe(

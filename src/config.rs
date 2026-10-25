@@ -187,17 +187,23 @@ impl Config {
         self.server.hmac_secret = Some(hmac_secret);
     }
 
+    pub fn get_email_domain(&self) -> String {
+        format!("@{}", self.server.email_tld.trim_start_matches('@'))
+    }
+
     pub fn get_no_reply_email(&self) -> String {
         format!(
             "{}{}",
-            self.server.no_reply_email_prefix, self.server.email_tld
+            self.server.no_reply_email_prefix,
+            self.get_email_domain()
         )
     }
 
     pub fn get_registration_email(&self) -> String {
         format!(
             "{}{}",
-            self.server.registration_email_prefix, self.server.email_tld
+            self.server.registration_email_prefix,
+            self.get_email_domain()
         )
     }
 }

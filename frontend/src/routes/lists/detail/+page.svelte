@@ -26,6 +26,7 @@
 	let previewError = $state('');
 	let previewRequest = 0;
 
+	let tld = $state('');
 	let email = $state({ subject: '', body: '', from: '', reply_to: '' });
 	let permissionEmail = $state('');
 	let permission: ListPermission = $state('read');
@@ -40,6 +41,12 @@
 		if (result.ok && result.data) details = result.data;
 		else error = result.message;
 		loading = false;
+	}
+
+	async function loadTld() {
+		const result = await api.getEmailTld();
+		if (result.ok && result.data) tld = result.data.tld;
+		else error = result.message;
 	}
 
 	async function loadAvailable() {
@@ -64,7 +71,7 @@
 
 	onMount(async () => {
 		listId = Number(page.url.searchParams.get('id'));
-		await loadList();
+		await Promise.all([loadList(), loadTld()]);
 		if (details) {
 			await Promise.all([loadAvailable(), loadPermissions()]);
 		}
@@ -326,18 +333,28 @@
 						</div>
 					</div>
 					<div class="grid gap-3 sm:grid-cols-2">
-						<input
-							type="email"
-							bind:value={email.from}
-							placeholder="From (SMTP default)"
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
-						/>
-						<input
-							type="email"
-							bind:value={email.reply_to}
-							placeholder="Reply-to (optional)"
-							class="w-full rounded-md border border-gray-300 px-3 py-2"
-						/>
+						<div
+							class="flex items-center rounded-md border border-gray-300 focus-within:border-blue-600"
+						>
+							<input
+								bind:value={email.from}
+								placeholder="From (SMTP default)"
+								aria-label="From"
+								class="min-w-0 flex-1 rounded-md px-3 py-2 outline-none"
+							/>
+							<span class="pr-3 text-sm text-gray-500">{tld}</span>
+						</div>
+						<div
+							class="flex items-center rounded-md border border-gray-300 focus-within:border-blue-600"
+						>
+							<input
+								bind:value={email.reply_to}
+								placeholder="Reply-to (optional)"
+								aria-label="Reply-to"
+								class="min-w-0 flex-1 rounded-md px-3 py-2 outline-none"
+							/>
+							<span class="pr-3 text-sm text-gray-500">{tld}</span>
+						</div>
 					</div>
 					<button class="rounded-md bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">
 						Send to {details.recipients.length} recipients
