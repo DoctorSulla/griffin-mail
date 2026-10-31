@@ -32,8 +32,9 @@ fn test_state(pool: PgPool) -> Arc<AppState> {
                 google_client_id: String::new(),
                 server_url: String::new(),
                 hmac_secret: Some(TEST_HMAC_SECRET.to_string()),
-                registration_email: String::from("registration@tld.com"),
-                no_reply_email: String::from("no-reply@tld.com"),
+                email_tld: String::from("tld.com"),
+                no_reply_email_prefix: String::from("no-reply"),
+                registration_email_prefix: String::from("registration"),
             },
             database: DatabaseConfig {
                 pool_size: 1,
