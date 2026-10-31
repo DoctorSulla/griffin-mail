@@ -298,7 +298,7 @@ export const api = {
 		unsubscribeText: string,
 		unsubscribeSignature: string
 	): Promise<ResourceResult> {
-		return resourceCall('/unsubscribe', 'POST', {
+		return resourceCall('/email/unsubscribe', 'POST', {
 			unsubscribe_text: unsubscribeText,
 			unsubscribe_signature: unsubscribeSignature
 		});

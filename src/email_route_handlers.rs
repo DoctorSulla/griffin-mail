@@ -381,13 +381,18 @@ pub async fn send_email_to_list(
         let hmac_secret = state.config.server.hmac_secret.clone().unwrap_or_default();
 
         let recipient_count = recipients.len();
+
+        if payload.body.len() > 100000 {
+            return Err(ErrorList::MarkdownTooLong.into());
+        }
+        let body_html = markdown::to_html(&payload.body);
         for recipient in recipients {
             let body = {
                 let unsubscribe_link =
                     generate_unsubscribe_link(&server_url, &recipient.email, &hmac_secret);
                 format!(
-                    "{}\n\n---\nTo unsubscribe, click here: {}",
-                    payload.body, unsubscribe_link
+                    "<p>Hi {},</p>{}<p><i>Don't want to receive these emails? Click <a href='{}'>here</a> to unsubscribe.</i></p>",
+                    recipient.name, body_html, unsubscribe_link
                 )
             };
 

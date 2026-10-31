@@ -111,5 +111,8 @@ pub fn get_open_routes() -> Router<Arc<AppState>> {
             "/setup/administrator",
             post(setup_route_handlers::create_administrator),
         )
-        .route("/unsubscribe", post(email_route_handlers::unsubscribe))
+        .route(
+            "/email/unsubscribe",
+            post(email_route_handlers::unsubscribe),
+        )
 }

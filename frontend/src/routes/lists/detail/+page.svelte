@@ -286,7 +286,7 @@
 										? 'border-blue-600 text-blue-700'
 										: 'border-transparent text-gray-600 hover:text-gray-900'}"
 								>
-									{view === 'raw' ? 'Raw Markdown' : 'Preview'}
+									{view === 'raw' ? 'Markdown' : 'Preview'}
 								</button>
 							{/each}
 						</div>
@@ -338,7 +338,7 @@
 						>
 							<input
 								bind:value={email.from}
-								placeholder="From (SMTP default)"
+								placeholder="From"
 								aria-label="From"
 								class="min-w-0 flex-1 rounded-md px-3 py-2 outline-none"
 							/>
