@@ -6,9 +6,11 @@ use axum::{
     response::IntoResponse,
 };
 use hmac::{Hmac, KeyInit, Mac};
+use jiff::Timestamp;
+use s3_signed_post::{Region, Service, SigningContext};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use tracing::{Level, event};
 
 use crate::{
@@ -106,6 +108,12 @@ pub struct ListEmailRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EmailPreview {
     pub html: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct S3UploadDetails {
+    pub upload_url: Option<String>,
+    pub post_fields: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -805,6 +813,27 @@ pub async fn get_email_tld(
         StatusCode::OK,
         Json(EmailTld {
             tld: state.config.get_email_domain(),
+        }),
+    ))
+}
+
+pub async fn get_s3_upload_details() -> Result<(StatusCode, Json<S3UploadDetails>), AppError> {
+    let signing_context =
+        SigningContext::new(Region::EuWest1, Timestamp::now(), Service::S3, "", "")
+            .with_session_token("");
+    let policy = s3_signed_post::Policy::new_with_expiration_in_minutes(30, &signing_context)
+        .bucket("griffin-mail-assets-237450453049-eu-west-1-an")
+        .content_length_range(1, 10485760)
+        .starts_with_content_type("image/")
+        .starts_with_key("media/");
+
+    let post_fields = policy.get_post_fields(&signing_context);
+    let upload_url = policy.get_s3_upload_url(&signing_context);
+    Ok((
+        StatusCode::OK,
+        Json(S3UploadDetails {
+            post_fields,
+            upload_url,
         }),
     ))
 }

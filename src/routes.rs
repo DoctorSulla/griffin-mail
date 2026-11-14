@@ -85,6 +85,10 @@ pub fn get_email_routes() -> Router<Arc<AppState>> {
         )
         .route("/email/mdToHtml", post(email_route_handlers::md_to_html))
         .route("/email/tld", get(email_route_handlers::get_email_tld))
+        .route(
+            "/email/s3_upload_details",
+            get(email_route_handlers::get_s3_upload_details),
+        )
 }
 
 pub fn get_open_routes() -> Router<Arc<AppState>> {

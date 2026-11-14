@@ -89,6 +89,11 @@ export interface ConfirmPasswordReset {
 	confirm_password: string;
 }
 
+export interface S3UploadDetails {
+	upload_url: string;
+	post_fields: Record<string, string>
+}
+
 export interface ApiResponse {
 	response_type: string;
 	message: string;
@@ -292,6 +297,10 @@ export const api = {
 
 	async getEmailTld(): Promise<ResourceResult<EmailTld>> {
 		return resourceCall('/email/tld');
+	},
+
+	async getS3UploadDetails(): Promise<ResourceResult<S3UploadDetails>> {
+		return resourceCall('/email/s3_upload_details');
 	},
 
 	async unsubscribe(
