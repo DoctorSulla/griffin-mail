@@ -1,4 +1,6 @@
 use crate::default_route_handlers::{AppError, ErrorList};
+use aws_config::BehaviorVersion;
+use aws_credential_types::provider::ProvideCredentials;
 use axum::{
     Json,
     extract::{Path, State},
@@ -818,9 +820,30 @@ pub async fn get_email_tld(
 }
 
 pub async fn get_s3_upload_details() -> Result<(StatusCode, Json<S3UploadDetails>), AppError> {
-    let signing_context =
-        SigningContext::new(Region::EuWest1, Timestamp::now(), Service::S3, "", "")
-            .with_session_token("");
+    let config = aws_config::defaults(BehaviorVersion::latest())
+        .region("eu-west-1")
+        .profile_name("roles_anywhere")
+        .load()
+        .await;
+
+    let credentials = config
+        .credentials_provider()
+        .ok_or(ErrorList::InvalidCredentialsConfig)?
+        .provide_credentials()
+        .await?;
+
+    let mut signing_context = SigningContext::new(
+        Region::EuWest1,
+        Timestamp::now(),
+        Service::S3,
+        credentials.access_key_id(),
+        credentials.secret_access_key(),
+    );
+
+    if let Some(session_token) = credentials.session_token() {
+        signing_context = signing_context.with_session_token(session_token);
+    }
+
     let policy = s3_signed_post::Policy::new_with_expiration_in_minutes(30, &signing_context)
         .bucket("griffin-mail-assets-237450453049-eu-west-1-an")
         .content_length_range(1, 10485760)

@@ -127,6 +127,8 @@ pub enum ErrorList {
     AdministratorAlreadyConfigured,
     #[error("Maximum markdown length exceeded")]
     MarkdownTooLong,
+    #[error("Invalid credentials config")]
+    InvalidCredentialsConfig,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
