@@ -848,7 +848,8 @@ pub async fn get_s3_upload_details() -> Result<(StatusCode, Json<S3UploadDetails
         .bucket("griffin-mail-assets-237450453049-eu-west-1-an")
         .content_length_range(1, 10485760)
         .starts_with_content_type("image/")
-        .starts_with_key("media/");
+        .starts_with_key("media/")
+        .success_action_redirect("http://100.65.163.6:3000/uploadSuccess");
 
     let post_fields = policy.get_post_fields(&signing_context);
     let upload_url = policy.get_s3_upload_url(&signing_context);

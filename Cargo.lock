@@ -2374,9 +2374,9 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "s3-signed-post"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6fffff6ad7d2f50928198d522e9f14a0fe1f98205a31ba2d868821104404d5d"
+checksum = "5953b7192c93c1b624eb327382a0ae74411ce9fda54cbe7d4e84352bbdffbe8b"
 dependencies = [
  "base64 0.23.1",
  "hex",
