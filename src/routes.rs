@@ -89,6 +89,7 @@ pub fn get_email_routes() -> Router<Arc<AppState>> {
             "/email/s3_upload_details",
             get(email_route_handlers::get_s3_upload_details),
         )
+        .route("/media", get(email_route_handlers::get_media))
 }
 
 pub fn get_open_routes() -> Router<Arc<AppState>> {

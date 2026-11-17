@@ -86,7 +86,7 @@
 
 <div class="mx-auto max-w-2xl py-8">
 	<h1 class="text-3xl font-bold text-gray-900">Upload image</h1>
-	<p class="mt-1 text-gray-600">Select or drag and drop an image file to upload.</p>
+	<p class="mt-1 text-gray-600">Select or drag and drop an image file to upload. Uploaded images can be included in emails and are visible to all users.</p>
 
 	<div class="mt-6 rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
 		{#if loading}

@@ -1,5 +1,4 @@
 use crate::default_route_handlers::{AppError, ErrorList};
-use aws_config::BehaviorVersion;
 use aws_credential_types::provider::ProvideCredentials;
 use axum::{
     Json,
@@ -819,14 +818,11 @@ pub async fn get_email_tld(
     ))
 }
 
-pub async fn get_s3_upload_details() -> Result<(StatusCode, Json<S3UploadDetails>), AppError> {
-    let config = aws_config::defaults(BehaviorVersion::latest())
-        .region("eu-west-1")
-        .profile_name("roles_anywhere")
-        .load()
-        .await;
-
-    let credentials = config
+pub async fn get_s3_upload_details(
+    State(state): State<Arc<AppState>>,
+) -> Result<(StatusCode, Json<S3UploadDetails>), AppError> {
+    let credentials = state
+        .aws_sdk_config
         .credentials_provider()
         .ok_or(ErrorList::InvalidCredentialsConfig)?
         .provide_credentials()
@@ -860,6 +856,71 @@ pub async fn get_s3_upload_details() -> Result<(StatusCode, Json<S3UploadDetails
             upload_url,
         }),
     ))
+}
+
+#[derive(Serialize)]
+pub struct MediaObject {
+    pub name: String,
+    pub url: String,
+    pub size: Option<i64>,
+    pub last_modified: Option<String>,
+}
+
+fn encode_s3_key(key: &str) -> String {
+    key.split('/')
+        .map(|segment| {
+            segment
+                .bytes()
+                .map(|byte| match byte {
+                    b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                        (byte as char).to_string()
+                    }
+                    _ => format!("%{byte:02X}"),
+                })
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+pub async fn get_media(
+    State(state): State<Arc<AppState>>,
+) -> Result<(StatusCode, Json<Vec<MediaObject>>), AppError> {
+    let client = aws_sdk_s3::Client::new(&state.aws_sdk_config);
+    let bucket = "griffin-mail-assets-237450453049-eu-west-1-an";
+    let region = "eu-west-1";
+
+    let pages: Vec<_> = client
+        .list_objects_v2()
+        .bucket(bucket)
+        .prefix("media/")
+        .into_paginator()
+        .send()
+        .try_collect()
+        .await?;
+
+    let media = pages
+        .into_iter()
+        .flat_map(|page| page.contents.unwrap_or_default())
+        .filter_map(|object| {
+            let key = object.key?;
+            let name = key.strip_prefix("media/")?;
+            if name.is_empty() {
+                return None;
+            }
+            Some(MediaObject {
+                name: name.to_string(),
+                url: format!(
+                    "https://{bucket}.s3.{region}.amazonaws.com/{}",
+                    encode_s3_key(&key)
+                ),
+                size: object.size,
+                last_modified: object.last_modified.map(|date| date.to_string()),
+            })
+        })
+        .collect();
+
+    Ok((StatusCode::OK, Json(media)))
 }
 
 #[cfg(test)]

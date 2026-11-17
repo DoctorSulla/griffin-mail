@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::{Config, DatabaseConfig, RuntimeEnvironment, ServerConfig, SmtpConfig};
+use aws_config::BehaviorVersion;
 use lettre::SmtpTransport;
 use sqlx::{PgPool, Row};
 
@@ -18,7 +19,13 @@ fn test_user(email: &str) -> User {
     }
 }
 
-fn test_state(pool: PgPool) -> Arc<AppState> {
+async fn test_state(pool: PgPool) -> Arc<AppState> {
+    let aws_sdk_config = aws_config::defaults(BehaviorVersion::latest())
+        .region("eu-west-1")
+        .profile_name("roles_anywhere")
+        .load()
+        .await;
+
     Arc::new(AppState {
         db_connection_pool: pool,
         email_connection_pool: SmtpTransport::builder_dangerous("localhost").build(),
@@ -50,6 +57,7 @@ fn test_state(pool: PgPool) -> Arc<AppState> {
                 send_emails: false,
             },
         },
+        aws_sdk_config,
     })
 }
 
@@ -110,7 +118,7 @@ async fn list_permissions_match_user_list_and_capability(pool: PgPool) {
     .await
     .unwrap();
 
-    let state = test_state(pool);
+    let state = test_state(pool).await;
     let alice = test_user("alice@example.com");
     let bob = test_user("bob@example.com");
 
@@ -138,7 +146,7 @@ async fn global_permissions_match_user_and_capability(pool: PgPool) {
     .await
     .unwrap();
 
-    let state = test_state(pool);
+    let state = test_state(pool).await;
     let alice = test_user("alice@example.com");
     let bob = test_user("bob@example.com");
 
@@ -153,7 +161,7 @@ async fn global_permissions_match_user_and_capability(pool: PgPool) {
 async fn create_list_requires_manage_list_and_grants_creator_all_permissions(pool: PgPool) {
     insert_user(&pool, "creator@example.com").await;
     let user = test_user("creator@example.com");
-    let state = test_state(pool.clone());
+    let state = test_state(pool.clone()).await;
 
     let denied = create_list(
         State(state.clone()),
@@ -237,7 +245,7 @@ async fn list_visibility_requires_explicit_read_permission(pool: PgPool) {
 
     let Json(lists) = expect_ok(
         get_lists(
-            State(test_state(pool)),
+            State(test_state(pool).await),
             VerifiedEmailUser(test_user("reader@example.com")),
         )
         .await,

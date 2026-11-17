@@ -1,3 +1,4 @@
+use aws_config::SdkConfig;
 use lettre::{
     SmtpTransport,
     transport::smtp::{
@@ -18,6 +19,7 @@ pub struct AppState {
     pub db_connection_pool: Pool<Postgres>,
     pub email_connection_pool: SmtpTransport,
     pub config: Config,
+    pub aws_sdk_config: SdkConfig,
 }
 
 #[derive(Deserialize, Clone)]

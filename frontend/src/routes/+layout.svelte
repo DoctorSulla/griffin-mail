@@ -34,7 +34,8 @@
 		{ text: 'Recipients', href: '/addRecipients', allowed: 'authenticated' },
 		{ text: 'Create list', href: '/createList', allowed: 'authenticated', navigation: false },
 		{ text: 'Permissions', href: '/permissions', allowed: 'authenticated' },
-		{ text: 'Profile', href: '/profile', allowed: 'authenticated' }
+		{ text: 'Profile', href: '/profile', allowed: 'authenticated' },
+		{ text: 'Upload Media', href: '/uploadImage', allowed: 'authenticated' }
 	];
 
 	function currentRoute(): Route | null {
