@@ -1,15 +1,26 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { Image as ImageIcon, FileText } from '@lucide/svelte';
 	import {
 		api,
 		type ListWithRecipients,
+		type MediaObject,
 		type Recipient,
 		type UserPermission,
 		type ListPermission
 	} from '$lib/api';
 	import Feedback from '$lib/Feedback.svelte';
+	import { isImage, mediaDetails, sortNewestFirst } from '$lib/media';
+
+	type EmailView = 'raw' | 'preview' | 'media';
+
+	const emailViews: { id: EmailView; label: string }[] = [
+		{ id: 'raw', label: 'Markdown' },
+		{ id: 'preview', label: 'Preview' },
+		{ id: 'media', label: 'Media' }
+	];
 
 	let listId = $state(0);
 	let details: ListWithRecipients | null = $state(null);
@@ -21,10 +32,18 @@
 	let availableMessage = $state('');
 	let permissionMessage = $state('');
 	let emailPreview = $state('');
-	let emailView = $state<'raw' | 'preview'>('raw');
+	let emailView = $state<EmailView>('raw');
 	let previewLoading = $state(false);
 	let previewError = $state('');
 	let previewRequest = 0;
+
+	let media = $state<MediaObject[]>([]);
+	let mediaLoaded = $state(false);
+	let mediaLoading = $state(false);
+	let mediaError = $state('');
+	let bodyInput = $state<HTMLTextAreaElement | null>(null);
+	// Where to insert media; null means append to the end of the message.
+	let bodySelection: { start: number; end: number } | null = null;
 
 	let tld = $state('');
 	let email = $state({ subject: '', body: '', from: '', reply_to: '' });
@@ -116,6 +135,7 @@
 		showResult(result, 'Email sent to the list.');
 		if (result.ok) {
 			email = { subject: '', body: '', from: '', reply_to: '' };
+			bodySelection = null;
 			selectEmailView('raw');
 		}
 	}
@@ -145,7 +165,7 @@
 		else showResult(result, '');
 	}
 
-	function selectEmailView(view: 'raw' | 'preview') {
+	function selectEmailView(view: EmailView) {
 		emailView = view;
 		// Invalidate requests when leaving the preview or starting a new one.
 		previewRequest += 1;
@@ -153,7 +173,52 @@
 		previewError = '';
 		previewLoading = false;
 		if (view === 'preview' && email.body.trim()) void showPreview(previewRequest);
+		if (view === 'media' && !mediaLoaded && !mediaLoading) void loadMedia();
 	}
+
+	async function loadMedia() {
+		mediaLoading = true;
+		mediaError = '';
+		const result = await api.getMedia();
+		mediaLoading = false;
+		if (result.ok) {
+			media = sortNewestFirst(result.data ?? []);
+			mediaLoaded = true;
+		} else {
+			mediaError = result.message || 'Could not load media. Please try again.';
+		}
+	}
+
+	function rememberSelection() {
+		if (bodyInput) {
+			bodySelection = { start: bodyInput.selectionStart, end: bodyInput.selectionEnd };
+		}
+	}
+
+	function mediaMarkdown(item: MediaObject) {
+		const label = item.name
+			.split('/')
+			.pop()!
+			.replace(/\.[^.]+$/, '')
+			.replace(/([\\[\]])/g, '\\$1');
+		return isImage(item) ? `![${label}](${item.url})` : `[${label}](${item.url})`;
+	}
+
+	async function insertMedia(item: MediaObject) {
+		const snippet = mediaMarkdown(item);
+		const body = email.body;
+		const start = Math.min(bodySelection?.start ?? body.length, body.length);
+		const end = Math.min(bodySelection?.end ?? body.length, body.length);
+		email.body = body.slice(0, start) + snippet + body.slice(end);
+
+		const cursor = start + snippet.length;
+		bodySelection = { start: cursor, end: cursor };
+		selectEmailView('raw');
+		await tick();
+		bodyInput?.focus();
+		bodyInput?.setSelectionRange(cursor, cursor);
+	}
+
 
 	async function showPreview(request: number) {
 		const markdown = email.body;
@@ -169,15 +234,20 @@
 	}
 
 	function handleTabKey(event: KeyboardEvent) {
-		let view: 'raw' | 'preview';
-		if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-			view = emailView === 'raw' ? 'preview' : 'raw';
+		const count = emailViews.length;
+		const index = emailViews.findIndex((view) => view.id === emailView);
+		let next: number;
+		if (event.key === 'ArrowRight') {
+			next = (index + 1) % count;
+		} else if (event.key === 'ArrowLeft') {
+			next = (index - 1 + count) % count;
 		} else if (event.key === 'Home') {
-			view = 'raw';
+			next = 0;
 		} else if (event.key === 'End') {
-			view = 'preview';
+			next = count - 1;
 		} else return;
 		event.preventDefault();
+		const view = emailViews[next].id;
 		selectEmailView(view);
 		document.getElementById(`email-${view}-tab`)?.focus();
 	}
@@ -271,22 +341,22 @@
 							aria-label="Message view"
 							class="mb-2 flex border-b border-gray-200"
 						>
-							{#each ['raw', 'preview'] as view}
+							{#each emailViews as view}
 								<button
 									type="button"
 									role="tab"
-									id={`email-${view}-tab`}
-									aria-selected={emailView === view}
-									aria-controls={`email-${view}-panel`}
-									tabindex={emailView === view ? 0 : -1}
-									onclick={() => selectEmailView(view === 'raw' ? 'raw' : 'preview')}
+									id={`email-${view.id}-tab`}
+									aria-selected={emailView === view.id}
+									aria-controls={`email-${view.id}-panel`}
+									tabindex={emailView === view.id ? 0 : -1}
+									onclick={() => selectEmailView(view.id)}
 									onkeydown={handleTabKey}
 									class="border-b-2 px-4 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 {emailView ===
-									view
+									view.id
 										? 'border-blue-600 text-blue-700'
 										: 'border-transparent text-gray-600 hover:text-gray-900'}"
 								>
-									{view === 'raw' ? 'Markdown' : 'Preview'}
+									{view.label}
 								</button>
 							{/each}
 						</div>
@@ -299,7 +369,9 @@
 							<textarea
 								required={emailView === 'raw'}
 								rows="7"
+								bind:this={bodyInput}
 								bind:value={email.body}
+								onblur={rememberSelection}
 								aria-label="Message in Markdown"
 								placeholder="Message (Markdown supported)"
 								class="w-full rounded-md border border-gray-300 px-3 py-2"
@@ -329,6 +401,86 @@
 								</p>
 							{:else}
 								<div id="email-preview">{@html emailPreview}</div>
+							{/if}
+						</div>
+						<div
+							id="email-media-panel"
+							role="tabpanel"
+							aria-labelledby="email-media-tab"
+							aria-busy={mediaLoading}
+							hidden={emailView !== 'media'}
+							class="rounded-md border border-gray-300"
+						>
+							<div
+								class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-3 py-2"
+							>
+								<p class="text-sm text-gray-600">Insert media at the cursor in your message.</p>
+								<div class="flex items-center gap-3 text-sm font-medium">
+									<button
+										type="button"
+										onclick={loadMedia}
+										disabled={mediaLoading}
+										class="text-blue-600 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+										>Refresh</button
+									>
+									<a href="/uploadImage" class="text-blue-600 hover:text-blue-800">Upload</a>
+								</div>
+							</div>
+							{#if mediaLoading}
+								<p role="status" class="p-3 text-sm text-gray-500">Loading media…</p>
+							{:else if mediaError}
+								<div class="p-3">
+									<p role="alert" class="text-sm text-red-700">{mediaError}</p>
+									<button
+										type="button"
+										onclick={loadMedia}
+										class="mt-2 text-sm font-medium text-blue-600 underline">Retry</button
+									>
+								</div>
+							{:else if media.length === 0}
+								<p class="p-3 text-sm text-gray-500">
+									No media yet. <a href="/uploadImage" class="text-blue-600 underline"
+										>Upload an image</a
+									> to use it in emails.
+								</p>
+							{:else}
+								<ul class="max-h-80 divide-y divide-gray-100 overflow-auto">
+									{#each media as item (item.url)}
+										<li class="flex items-center justify-between gap-3 px-3 py-2">
+											<div class="flex min-w-0 items-center gap-3">
+												{#if isImage(item)}
+													<img
+														src={item.url}
+														alt=""
+														loading="lazy"
+														class="h-12 w-12 shrink-0 rounded-md border border-gray-200 object-cover"
+													/>
+												{:else}
+													<div
+														class="flex h-12 w-12 shrink-0 items-center justify-center rounded-md border border-gray-200 bg-gray-50 text-gray-400"
+													>
+														<FileText class="h-5 w-5" />
+													</div>
+												{/if}
+												<div class="min-w-0">
+													<p class="truncate text-sm font-medium text-gray-900" title={item.name}>
+														{item.name}
+													</p>
+													<p class="text-xs text-gray-500">{mediaDetails(item)}</p>
+												</div>
+											</div>
+											<button
+												type="button"
+												onclick={() => insertMedia(item)}
+												aria-label={`Insert ${item.name}`}
+												class="flex shrink-0 items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+											>
+												<ImageIcon class="h-4 w-4" />
+												Insert
+											</button>
+										</li>
+									{/each}
+								</ul>
 							{/if}
 						</div>
 					</div>

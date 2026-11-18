@@ -35,6 +35,7 @@
 		{ text: 'Create list', href: '/createList', allowed: 'authenticated', navigation: false },
 		{ text: 'Permissions', href: '/permissions', allowed: 'authenticated' },
 		{ text: 'Profile', href: '/profile', allowed: 'authenticated' },
+		{ text: 'Media', href: '/media', allowed: 'authenticated' },
 		{ text: 'Upload Media', href: '/uploadImage', allowed: 'authenticated' }
 	];
 

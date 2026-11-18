@@ -1,6 +1,6 @@
 #![warn(unused_extern_crates)]
 
-use aws_config::BehaviorVersion;
+use aws_config::{BehaviorVersion, Region};
 use axum::Router;
 use axum::body::Body;
 use axum::extract::Request;
@@ -101,8 +101,8 @@ pub async fn get_app_state() -> Arc<AppState> {
 
     event!(Level::INFO, "Getting AWS SDK Config");
     let aws_sdk_config = aws_config::defaults(BehaviorVersion::latest())
-        .region("eu-west-1")
-        .profile_name("roles_anywhere")
+        .region(Region::new(config.aws.region.clone()))
+        .profile_name(&config.aws.profile_name)
         .load()
         .await;
 

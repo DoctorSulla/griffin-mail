@@ -91,7 +91,14 @@ export interface ConfirmPasswordReset {
 
 export interface S3UploadDetails {
 	upload_url: string;
-	post_fields: Record<string, string>
+	post_fields: Record<string, string>;
+}
+
+export interface MediaObject {
+	name: string;
+	url: string;
+	size?: number;
+	last_modified?: string;
 }
 
 export interface ApiResponse {
@@ -301,6 +308,15 @@ export const api = {
 
 	async getS3UploadDetails(): Promise<ResourceResult<S3UploadDetails>> {
 		return resourceCall('/email/s3_upload_details');
+	},
+
+	async getMedia(): Promise<ResourceResult<MediaObject[]>> {
+		return resourceCall('/email/media');
+	},
+
+	async deleteMedia(name: string): Promise<ResourceResult> {
+		const path = name.split('/').map(encodeURIComponent).join('/');
+		return resourceCall(`/email/media/${path}`, 'DELETE');
 	},
 
 	async unsubscribe(

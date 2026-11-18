@@ -828,8 +828,9 @@ pub async fn get_s3_upload_details(
         .provide_credentials()
         .await?;
 
+    let media_config = &state.config.media;
     let mut signing_context = SigningContext::new(
-        Region::EuWest1,
+        Region::Custom(state.config.aws.region.clone()),
         Timestamp::now(),
         Service::S3,
         credentials.access_key_id(),
@@ -841,11 +842,11 @@ pub async fn get_s3_upload_details(
     }
 
     let policy = s3_signed_post::Policy::new_with_expiration_in_minutes(30, &signing_context)
-        .bucket("griffin-mail-assets-237450453049-eu-west-1-an")
-        .content_length_range(1, 10485760)
+        .bucket(&media_config.bucket)
+        .content_length_range(1, media_config.max_upload_size_bytes)
         .starts_with_content_type("image/")
-        .starts_with_key("media/")
-        .success_action_redirect("http://100.65.163.6:3000/uploadSuccess");
+        .starts_with_key(&media_config.prefix)
+        .success_action_redirect(&media_config.upload_success_redirect);
 
     let post_fields = policy.get_post_fields(&signing_context);
     let upload_url = policy.get_s3_upload_url(&signing_context);
@@ -887,13 +888,13 @@ pub async fn get_media(
     State(state): State<Arc<AppState>>,
 ) -> Result<(StatusCode, Json<Vec<MediaObject>>), AppError> {
     let client = aws_sdk_s3::Client::new(&state.aws_sdk_config);
-    let bucket = "griffin-mail-assets-237450453049-eu-west-1-an";
-    let region = "eu-west-1";
+    let media_config = &state.config.media;
+    let public_url = media_config.public_url.trim_end_matches('/');
 
     let pages: Vec<_> = client
         .list_objects_v2()
-        .bucket(bucket)
-        .prefix("media/")
+        .bucket(&media_config.bucket)
+        .prefix(&media_config.prefix)
         .into_paginator()
         .send()
         .try_collect()
@@ -904,16 +905,13 @@ pub async fn get_media(
         .flat_map(|page| page.contents.unwrap_or_default())
         .filter_map(|object| {
             let key = object.key?;
-            let name = key.strip_prefix("media/")?;
+            let name = key.strip_prefix(&media_config.prefix)?;
             if name.is_empty() {
                 return None;
             }
             Some(MediaObject {
                 name: name.to_string(),
-                url: format!(
-                    "https://{bucket}.s3.{region}.amazonaws.com/{}",
-                    encode_s3_key(&key)
-                ),
+                url: format!("{public_url}/{}", encode_s3_key(name)),
                 size: object.size,
                 last_modified: object.last_modified.map(|date| date.to_string()),
             })
@@ -921,6 +919,39 @@ pub async fn get_media(
         .collect();
 
     Ok((StatusCode::OK, Json(media)))
+}
+
+fn is_valid_media_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .split('/')
+            .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
+}
+
+pub async fn delete_media(
+    State(state): State<Arc<AppState>>,
+    user: VerifiedEmailUser,
+    Path(name): Path<String>,
+) -> Result<StatusCode, AppError> {
+    if !is_valid_media_name(&name) {
+        return Err(ErrorList::InvalidMediaName.into());
+    }
+
+    let client = aws_sdk_s3::Client::new(&state.aws_sdk_config);
+    client
+        .delete_object()
+        .bucket(&state.config.media.bucket)
+        .key(state.config.media.key(&name))
+        .send()
+        .await?;
+
+    event!(
+        Level::INFO,
+        user_email = %user.email,
+        media_name = %name,
+        "Media deleted"
+    );
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[cfg(test)]

@@ -1,6 +1,8 @@
 use super::*;
-use crate::config::{Config, DatabaseConfig, RuntimeEnvironment, ServerConfig, SmtpConfig};
-use aws_config::BehaviorVersion;
+use crate::config::{
+    AwsConfig, Config, DatabaseConfig, MediaConfig, RuntimeEnvironment, ServerConfig, SmtpConfig,
+};
+use aws_config::{BehaviorVersion, Region};
 use lettre::SmtpTransport;
 use sqlx::{PgPool, Row};
 
@@ -20,9 +22,13 @@ fn test_user(email: &str) -> User {
 }
 
 async fn test_state(pool: PgPool) -> Arc<AppState> {
+    let aws = AwsConfig {
+        region: "eu-west-1".to_string(),
+        profile_name: "roles_anywhere".to_string(),
+    };
     let aws_sdk_config = aws_config::defaults(BehaviorVersion::latest())
-        .region("eu-west-1")
-        .profile_name("roles_anywhere")
+        .region(Region::new(aws.region.clone()))
+        .profile_name(&aws.profile_name)
         .load()
         .await;
 
@@ -55,6 +61,14 @@ async fn test_state(pool: PgPool) -> Arc<AppState> {
                 password: Some("test".to_string()),
                 pool_size: 1,
                 send_emails: false,
+            },
+            aws,
+            media: MediaConfig {
+                bucket: "test-bucket".to_string(),
+                prefix: "media/".to_string(),
+                public_url: "https://media.example.com".to_string(),
+                max_upload_size_bytes: 10485760,
+                upload_success_redirect: "http://localhost:3000/uploadSuccess".to_string(),
             },
         },
         aws_sdk_config,
@@ -390,4 +404,19 @@ async fn test_exceeded_max_length_md() {
         .await
         .is_err()
     )
+}
+
+#[test]
+fn media_names_must_not_escape_the_media_prefix() {
+    assert!(is_valid_media_name("photo.jpg"));
+    assert!(is_valid_media_name("photo 1.jpg"));
+    assert!(is_valid_media_name("events/2026/photo.jpg"));
+
+    assert!(!is_valid_media_name(""));
+    assert!(!is_valid_media_name("../secret.txt"));
+    assert!(!is_valid_media_name("events/../photo.jpg"));
+    assert!(!is_valid_media_name("./photo.jpg"));
+    assert!(!is_valid_media_name("/photo.jpg"));
+    assert!(!is_valid_media_name("events//photo.jpg"));
+    assert!(!is_valid_media_name("events/"));
 }

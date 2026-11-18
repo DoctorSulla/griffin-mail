@@ -18,3 +18,15 @@ google_client_id = "988343938519-vle7kps2l5f6cdnjluibda25o66h2jpn.apps.googleuse
 server_url = ""
 no_reply_email = ""
 registration_email = ""
+
+[aws]
+region = "eu-west-1"
+profile_name = "roles_anywhere"
+
+[media]
+bucket = "griffin-mail-assets-237450453049-eu-west-1-an"
+prefix = "media/"
+# Base URL media is served from; this distribution already points at the prefix above.
+public_url = "https://d1pbjdmktpilh0.cloudfront.net"
+max_upload_size_bytes = 10485760
+upload_success_redirect = "http://100.65.163.6:3000/uploadSuccess"

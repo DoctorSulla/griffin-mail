@@ -19,3 +19,15 @@ server_url = "http://localhost:3000"
 email_tld = "wltc.club"
 no_reply_email_prefix = "no-reply"
 registration_email_prefix = "registration"
+
+[aws]
+region = "eu-west-1"
+profile_name = "roles_anywhere"
+
+[media]
+bucket = "griffin-mail-assets-237450453049-eu-west-1-an"
+prefix = "media/"
+# Base URL media is served from; this distribution already points at the prefix above.
+public_url = "https://d1pbjdmktpilh0.cloudfront.net"
+max_upload_size_bytes = 10485760
+upload_success_redirect = "http://100.65.163.6:3000/uploadSuccess"

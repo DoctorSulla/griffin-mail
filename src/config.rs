@@ -27,8 +27,33 @@ pub struct Config {
     pub server: ServerConfig,
     pub database: DatabaseConfig,
     pub email: SmtpConfig,
+    pub aws: AwsConfig,
+    pub media: MediaConfig,
     #[serde(skip)]
     pub environment: RuntimeEnvironment,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct AwsConfig {
+    pub region: String,
+    pub profile_name: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct MediaConfig {
+    pub bucket: String,
+    /// Key prefix within the bucket, e.g. "media/".
+    pub prefix: String,
+    /// Base URL media is served from (e.g. a CloudFront distribution pointing at the prefix).
+    pub public_url: String,
+    pub max_upload_size_bytes: usize,
+    pub upload_success_redirect: String,
+}
+
+impl MediaConfig {
+    pub fn key(&self, name: &str) -> String {
+        format!("{}{name}", self.prefix)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]

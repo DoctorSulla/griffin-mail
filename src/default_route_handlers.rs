@@ -129,6 +129,8 @@ pub enum ErrorList {
     MarkdownTooLong,
     #[error("Invalid credentials config")]
     InvalidCredentialsConfig,
+    #[error("Invalid media name")]
+    InvalidMediaName,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
