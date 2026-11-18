@@ -11,6 +11,8 @@ use middleware::ValidateSessionLayer;
 use routes::*;
 use rust_embed::Embed;
 use sqlx::migrate;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::{
     collections::HashMap,
@@ -48,6 +50,26 @@ pub async fn start_app() {
     let _ = span.enter();
 
     let app_state = get_app_state().await;
+
+    let email_token_bucket_app_state = app_state.clone();
+
+    tokio::spawn(async move {
+        loop {
+            if email_token_bucket_app_state
+                .email_token_bucket
+                .load(Ordering::SeqCst)
+                >= 10
+            {
+                println!("The bucket is full");
+            } else {
+                println!("Adding 1 to the bucket");
+                email_token_bucket_app_state
+                    .email_token_bucket
+                    .fetch_add(1, Ordering::SeqCst);
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    });
 
     start_session_cleaner(app_state.clone()).await;
 
@@ -106,11 +128,14 @@ pub async fn get_app_state() -> Arc<AppState> {
         .load()
         .await;
 
+    let email_token_bucket = AtomicUsize::new(1);
+
     Arc::new(AppState {
         db_connection_pool,
         email_connection_pool,
         config,
         aws_sdk_config,
+        email_token_bucket,
     })
 }
 

@@ -7,19 +7,19 @@ use lettre::{
     },
 };
 use serde::Deserialize;
-use std::env;
+use std::{env, sync::atomic::AtomicUsize};
 use std::{fs::File, io::prelude::*};
 use std::{str::FromStr, time::Duration};
 use tracing::{Level, event};
 
 use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 
-#[derive(Clone)]
 pub struct AppState {
     pub db_connection_pool: Pool<Postgres>,
     pub email_connection_pool: SmtpTransport,
     pub config: Config,
     pub aws_sdk_config: SdkConfig,
+    pub email_token_bucket: AtomicUsize,
 }
 
 #[derive(Deserialize, Clone)]

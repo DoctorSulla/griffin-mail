@@ -1,3 +1,5 @@
+use std::sync::atomic::AtomicUsize;
+
 use super::*;
 use crate::config::{
     AwsConfig, Config, DatabaseConfig, MediaConfig, RuntimeEnvironment, ServerConfig, SmtpConfig,
@@ -72,6 +74,7 @@ async fn test_state(pool: PgPool) -> Arc<AppState> {
             },
         },
         aws_sdk_config,
+        email_token_bucket: AtomicUsize::new(1),
     })
 }
 
