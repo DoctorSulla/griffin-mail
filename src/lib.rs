@@ -11,13 +11,12 @@ use middleware::ValidateSessionLayer;
 use routes::*;
 use rust_embed::Embed;
 use sqlx::migrate;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::{
     collections::HashMap,
     sync::{Arc, LazyLock, RwLock},
 };
+use tokio::sync::Semaphore;
 use tower::ServiceBuilder;
 use tower_http::{cors::CorsLayer, timeout::TimeoutLayer};
 use tracing::{Level, event, span};
@@ -41,6 +40,29 @@ static NONCE_STORE: LazyLock<Arc<RwLock<HashMap<String, i64>>>> =
 #[folder = "frontend/build"]
 pub struct Asset;
 
+fn initialise_token_bucket(
+    app_state: Arc<AppState>,
+    max_capacity: usize,
+    refill_rate: usize,
+    refill_period: usize,
+) {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(refill_period as u64));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        interval.tick().await;
+
+        loop {
+            interval.tick().await;
+            let available_permits = app_state.email_token_bucket.available_permits();
+            if available_permits < max_capacity {
+                app_state
+                    .email_token_bucket
+                    .add_permits(refill_rate.min(max_capacity - available_permits));
+            }
+        }
+    });
+}
+
 pub async fn start_app() {
     // Start tracing
     tracing_subscriber::FmtSubscriber::builder()
@@ -51,25 +73,9 @@ pub async fn start_app() {
 
     let app_state = get_app_state().await;
 
-    let email_token_bucket_app_state = app_state.clone();
+    let token_bucket_app_state = app_state.clone();
 
-    tokio::spawn(async move {
-        loop {
-            if email_token_bucket_app_state
-                .email_token_bucket
-                .load(Ordering::SeqCst)
-                >= 10
-            {
-                println!("The bucket is full");
-            } else {
-                println!("Adding 1 to the bucket");
-                email_token_bucket_app_state
-                    .email_token_bucket
-                    .fetch_add(1, Ordering::SeqCst);
-            }
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-    });
+    initialise_token_bucket(token_bucket_app_state, 1, 1, 1);
 
     start_session_cleaner(app_state.clone()).await;
 
@@ -128,7 +134,7 @@ pub async fn get_app_state() -> Arc<AppState> {
         .load()
         .await;
 
-    let email_token_bucket = AtomicUsize::new(1);
+    let email_token_bucket = Semaphore::new(1);
 
     Arc::new(AppState {
         db_connection_pool,

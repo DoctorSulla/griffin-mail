@@ -1,5 +1,3 @@
-use std::sync::atomic::AtomicUsize;
-
 use super::*;
 use crate::config::{
     AwsConfig, Config, DatabaseConfig, MediaConfig, RuntimeEnvironment, ServerConfig, SmtpConfig,
@@ -7,6 +5,7 @@ use crate::config::{
 use aws_config::{BehaviorVersion, Region};
 use lettre::SmtpTransport;
 use sqlx::{PgPool, Row};
+use tokio::sync::Semaphore;
 
 const TEST_HMAC_SECRET: &str = "test-secret-key-12345";
 
@@ -74,7 +73,7 @@ async fn test_state(pool: PgPool) -> Arc<AppState> {
             },
         },
         aws_sdk_config,
-        email_token_bucket: AtomicUsize::new(1),
+        email_token_bucket: Semaphore::new(1),
     })
 }
 

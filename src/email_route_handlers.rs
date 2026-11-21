@@ -389,38 +389,48 @@ pub async fn send_email_to_list(
         let server_url = state.config.server.server_url.clone();
         let hmac_secret = state.config.server.hmac_secret.clone().unwrap_or_default();
 
-        let recipient_count = recipients.len();
-
         if payload.body.len() > 100000 {
             return Err(ErrorList::MarkdownTooLong.into());
         }
         let body_html = markdown::to_html(&payload.body);
-        for recipient in recipients {
-            let body = {
-                let unsubscribe_link =
-                    generate_unsubscribe_link(&server_url, &recipient.email, &hmac_secret);
-                format!(
-                    "<p>Hi {},</p>{}<p><i>Don't want to receive these emails? Click <a href='{}'>here</a> to unsubscribe.</i></p>",
-                    recipient.name, body_html, unsubscribe_link
-                )
-            };
 
-            let email = Email {
-                to: recipient.email,
-                from: from.clone(),
-                subject: payload.subject.clone(),
-                body,
-                reply_to: Some(reply_to.clone()),
-            };
-            send_email(state.clone(), email).await?;
-        }
-        event!(
-            Level::INFO,
-            user_email = %user.email,
-            list_id = id,
-            recipient_count,
-            "Email sent to list"
-        );
+        tokio::spawn(async move {
+            let mut recipients_iter = recipients.into_iter();
+            loop {
+                let acquire = state.email_token_bucket.acquire().await;
+                if let Ok(permit) = acquire {
+                    if let Some(recipient) = recipients_iter.next() {
+                        let body = {
+                            let unsubscribe_link = generate_unsubscribe_link(
+                                &server_url,
+                                &recipient.email,
+                                &hmac_secret,
+                            );
+                            format!(
+                                "<p>Hi {},</p>{}<p><i>Don't want to receive these emails? Click <a href='{}'>here</a> to unsubscribe.</i></p>",
+                                recipient.name, body_html, unsubscribe_link
+                            )
+                        };
+
+                        let email = Email {
+                            to: recipient.email,
+                            from: from.clone(),
+                            subject: payload.subject.clone(),
+                            body,
+                            reply_to: Some(reply_to.clone()),
+                        };
+                        // TODO Currently if email sending fails this is logged but not retried ot
+                        // surfaced to the user
+                        send_email(state.clone(), email).await.unwrap_or_else(|e| {
+                            event!(Level::WARN, "Failed to send email due to {:?}", e);
+                        });
+                        permit.forget();
+                    } else {
+                        event!(Level::INFO, "Finished sending emails to list");
+                    }
+                }
+            }
+        });
 
         Ok(StatusCode::NO_CONTENT)
     } else {
