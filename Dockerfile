@@ -34,6 +34,7 @@ FROM debian:trixie-slim
 WORKDIR /app
 
 COPY --from=builder /app/aws_signing_helper /usr/bin
+RUN chmod +x /usr/bin/aws_signing_helper
 COPY --from=builder /app/target/release/griffin-mail /usr/local/bin/app
 COPY --from=builder /app/config.toml /app/config.toml
 
