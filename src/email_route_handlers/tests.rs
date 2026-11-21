@@ -422,3 +422,61 @@ fn media_names_must_not_escape_the_media_prefix() {
     assert!(!is_valid_media_name("events//photo.jpg"));
     assert!(!is_valid_media_name("events/"));
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn media_upload_and_delete_require_manage_media_permission(pool: PgPool) {
+    insert_user(&pool, "uploader@example.com").await;
+    let state = test_state(pool.clone()).await;
+
+    let upload_denied = get_s3_upload_details(
+        State(state.clone()),
+        VerifiedEmailUser(test_user("uploader@example.com")),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        app_error_message(upload_denied).await,
+        ErrorList::NoManageMediaPermission.to_string()
+    );
+
+    let delete_denied = delete_media(
+        State(state.clone()),
+        VerifiedEmailUser(test_user("uploader@example.com")),
+        Path("photo.jpg".to_string()),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        app_error_message(delete_denied).await,
+        ErrorList::NoManageMediaPermission.to_string()
+    );
+
+    sqlx::query(
+        "INSERT INTO global_user_permissions (user_email, permission)
+             VALUES ('uploader@example.com', 'manage_media')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    assert!(
+        user_has_global_permission(
+            &test_user("uploader@example.com"),
+            state.clone(),
+            GlobalPermission::ManageMedia,
+        )
+        .await
+    );
+
+    let invalid_name = delete_media(
+        State(state),
+        VerifiedEmailUser(test_user("uploader@example.com")),
+        Path("../secret.txt".to_string()),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        app_error_message(invalid_name).await,
+        ErrorList::InvalidMediaName.to_string()
+    );
+}

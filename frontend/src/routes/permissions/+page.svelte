@@ -66,6 +66,7 @@
 			>
 				<option value="manage_list">Create and delete lists</option>
 				<option value="manage_recipient">Create and delete recipients</option>
+				<option value="manage_media">Upload and delete media</option>
 				<option value="change_permission">Manage global permissions</option>
 			</select>
 		</div>

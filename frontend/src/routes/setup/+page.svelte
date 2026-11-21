@@ -35,7 +35,7 @@
 			<h1 class="mt-6 text-center text-3xl font-extrabold text-gray-900">Set up Griffin Mail</h1>
 			<p class="mt-2 text-center text-sm text-gray-600">
 				Create the first administrator account. This account will be able to manage lists,
-				recipients, and user permissions.
+				recipients, media, and user permissions.
 			</p>
 		</div>
 

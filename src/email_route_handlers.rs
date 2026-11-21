@@ -42,6 +42,7 @@ enum GlobalPermission {
     ManageList,
     ManageRecipient,
     ChangePermission,
+    ManageMedia,
 }
 
 impl From<GlobalPermission> for String {
@@ -50,6 +51,7 @@ impl From<GlobalPermission> for String {
             GlobalPermission::ManageList => "manage_list".to_string(),
             GlobalPermission::ManageRecipient => "manage_recipient".to_string(),
             GlobalPermission::ChangePermission => "change_permission".to_string(),
+            GlobalPermission::ManageMedia => "manage_media".to_string(),
         }
     }
 }
@@ -830,7 +832,13 @@ pub async fn get_email_tld(
 
 pub async fn get_s3_upload_details(
     State(state): State<Arc<AppState>>,
+    user: VerifiedEmailUser,
 ) -> Result<(StatusCode, Json<S3UploadDetails>), AppError> {
+    if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageMedia).await {
+        log_permission_denied(&user, "get_s3_upload_details", "global:manage_media", None);
+        return Err(ErrorList::NoManageMediaPermission.into());
+    }
+
     let credentials = state
         .aws_sdk_config
         .credentials_provider()
@@ -943,6 +951,11 @@ pub async fn delete_media(
     user: VerifiedEmailUser,
     Path(name): Path<String>,
 ) -> Result<StatusCode, AppError> {
+    if !user_has_global_permission(&user, state.clone(), GlobalPermission::ManageMedia).await {
+        log_permission_denied(&user, "delete_media", "global:manage_media", None);
+        return Err(ErrorList::NoManageMediaPermission.into());
+    }
+
     if !is_valid_media_name(&name) {
         return Err(ErrorList::InvalidMediaName.into());
     }

@@ -32,7 +32,11 @@ export interface ListWithRecipients {
 }
 
 export type ListPermission = 'read' | 'write' | 'send' | 'change_permission';
-export type GlobalPermission = 'manage_list' | 'manage_recipient' | 'change_permission';
+export type GlobalPermission =
+	| 'manage_list'
+	| 'manage_recipient'
+	| 'change_permission'
+	| 'manage_media';
 
 export interface UserPermission {
 	user_email: string;
