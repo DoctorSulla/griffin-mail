@@ -1,0 +1,33 @@
+# fly.toml app configuration file generated for griffin-mail on 2026-11-21T11:51:35Z
+#
+# See https://docs.fly.io/reference/configuration for information about how to use this file.
+#
+
+app = 'griffin-mail'
+primary_region = 'lhr'
+
+[build]
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ['app']
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+
+[[files]]
+  guest_path = "/root/.aws/cert/griffin_mail.crt"
+  local_path = "/home/matt/.aws/cert/griffin_mail.crt"
+
+[[files]]
+  guest_path = "/root/.aws/cert/griffin_mail.key"
+  local_path = "/home/matt/.aws/cert/griffin_mail.key"
+
+[[files]]
+  guest_path = "/root/.aws/credentials"
+  local_path = "/home/matt/.aws/ra_credentials"

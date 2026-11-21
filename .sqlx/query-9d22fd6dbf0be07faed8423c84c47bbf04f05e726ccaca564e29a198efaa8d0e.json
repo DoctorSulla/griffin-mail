@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM global_user_permissions WHERE (user_email,permission) IN((\n            SELECT user_email,permission FROM UNNEST($1::text[], $2::text[]) AS t(user_email, permission)))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9d22fd6dbf0be07faed8423c84c47bbf04f05e726ccaca564e29a198efaa8d0e"
+}

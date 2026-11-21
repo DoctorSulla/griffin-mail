@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO lists_to_recipients (list_id, recipient_id)\n            SELECT $1,recipient_id FROM UNNEST($2::integer[]) AS t(recipient_id)\n            ON CONFLICT (list_id, recipient_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4Array"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4e8f81f6f9a884a242d90259a434da7279c690421336d54261cde750c88c7721"
+}

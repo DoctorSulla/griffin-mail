@@ -1,0 +1,163 @@
+# flyctl launch added from .delta/worktrees/4t518j67vn2b/griffin-mail/.gitignore
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/target
+
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/node_modules
+
+# Output
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/frontend/.output
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/frontend/.vercel
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/frontend/.netlify
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/frontend/.wrangler
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/frontend/.svelte-kit
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/frontend/build
+
+# OS
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/.DS_Store
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/Thumbs.db
+
+# Env
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/.env
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/.env.*
+!.delta/worktrees/4t518j67vn2b/griffin-mail/**/.env.example
+!.delta/worktrees/4t518j67vn2b/griffin-mail/**/.env.test
+
+# Vite
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/vite.config.js.timestamp-*
+.delta/worktrees/4t518j67vn2b/griffin-mail/**/vite.config.ts.timestamp-*
+
+# flyctl launch added from .delta/worktrees/7r42nehm1k3f/griffin-mail/.gitignore
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/target
+
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/node_modules
+
+# Output
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/frontend/.output
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/frontend/.vercel
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/frontend/.netlify
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/frontend/.wrangler
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/frontend/.svelte-kit
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/frontend/build
+
+# OS
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/.DS_Store
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/Thumbs.db
+
+# Env
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/.env
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/.env.*
+!.delta/worktrees/7r42nehm1k3f/griffin-mail/**/.env.example
+!.delta/worktrees/7r42nehm1k3f/griffin-mail/**/.env.test
+
+# Vite
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/vite.config.js.timestamp-*
+.delta/worktrees/7r42nehm1k3f/griffin-mail/**/vite.config.ts.timestamp-*
+
+# flyctl launch added from .delta/worktrees/87467q0p3q7j/griffin-mail/.gitignore
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/target
+
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/node_modules
+
+# Output
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/frontend/.output
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/frontend/.vercel
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/frontend/.netlify
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/frontend/.wrangler
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/frontend/.svelte-kit
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/frontend/build
+
+# OS
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/.DS_Store
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/Thumbs.db
+
+# Env
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/.env
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/.env.*
+!.delta/worktrees/87467q0p3q7j/griffin-mail/**/.env.example
+!.delta/worktrees/87467q0p3q7j/griffin-mail/**/.env.test
+
+# Vite
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/vite.config.js.timestamp-*
+.delta/worktrees/87467q0p3q7j/griffin-mail/**/vite.config.ts.timestamp-*
+
+# flyctl launch added from .delta/worktrees/whsf3933ev9r/griffin-mail/.gitignore
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/target
+
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/node_modules
+
+# Output
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/frontend/.output
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/frontend/.vercel
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/frontend/.netlify
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/frontend/.wrangler
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/frontend/.svelte-kit
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/frontend/build
+
+# OS
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/.DS_Store
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/Thumbs.db
+
+# Env
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/.env
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/.env.*
+!.delta/worktrees/whsf3933ev9r/griffin-mail/**/.env.example
+!.delta/worktrees/whsf3933ev9r/griffin-mail/**/.env.test
+
+# Vite
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/vite.config.js.timestamp-*
+.delta/worktrees/whsf3933ev9r/griffin-mail/**/vite.config.ts.timestamp-*
+
+# flyctl launch added from .delta/worktrees/wyjh0fgnfnrc/griffin-mail/.gitignore
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/target
+
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/node_modules
+
+# Output
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/frontend/.output
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/frontend/.vercel
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/frontend/.netlify
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/frontend/.wrangler
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/frontend/.svelte-kit
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/frontend/build
+
+# OS
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/.DS_Store
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/Thumbs.db
+
+# Env
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/.env
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/.env.*
+!.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/.env.example
+!.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/.env.test
+
+# Vite
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/vite.config.js.timestamp-*
+.delta/worktrees/wyjh0fgnfnrc/griffin-mail/**/vite.config.ts.timestamp-*
+
+# flyctl launch added from .gitignore
+**/target
+
+**/node_modules
+
+# Output
+**/frontend/.output
+**/frontend/.vercel
+**/frontend/.netlify
+**/frontend/.wrangler
+**/frontend/.svelte-kit
+**/frontend/build
+
+# OS
+**/.DS_Store
+**/Thumbs.db
+
+# Env
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.test
+
+# Vite
+**/vite.config.js.timestamp-*
+**/vite.config.ts.timestamp-*
+fly.toml
+.git

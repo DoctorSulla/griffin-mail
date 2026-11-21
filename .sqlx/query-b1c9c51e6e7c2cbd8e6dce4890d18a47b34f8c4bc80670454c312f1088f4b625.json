@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO global_user_permissions (user_email, permission)\n            SELECT user_email,permission FROM UNNEST($1::text[], $2::text[]) AS t(user_email, permission)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b1c9c51e6e7c2cbd8e6dce4890d18a47b34f8c4bc80670454c312f1088f4b625"
+}

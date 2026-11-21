@@ -1,23 +1,24 @@
 [database]
 username = "neondb_owner"
-connection_url = "ep-summer-wind-abumg0f3-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require"
-pool_size = 5
+connection_url = "ep-long-thunder-zal44u7b-pooler.c-2.eu-west-2.aws.neon.tech/neondb"
+pool_size = 10
 
 [email]
-server_url = ""
-username = ""
-pool_size = 5
-send_emails = false
+server_url = "email-smtp.eu-west-1.amazonaws.com"
+username = "AKIATOSJGMA4RZNDCBFJ"
+pool_size = 10
+send_emails = true
 
 [server]
 request_timeout = 20
-port = 80
+port = 8080
 max_unsuccessful_login_attempts = 10
 session_length_in_days = 180
 google_client_id = "988343938519-vle7kps2l5f6cdnjluibda25o66h2jpn.apps.googleusercontent.com"
-server_url = ""
-no_reply_email = ""
-registration_email = ""
+server_url = "https://griffinmail.app"
+email_tld = "wltc.club"
+no_reply_email_prefix = "no-reply"
+registration_email_prefix = "registration"
 
 [aws]
 region = "eu-west-1"
@@ -29,4 +30,4 @@ prefix = "media/"
 # Base URL media is served from; this distribution already points at the prefix above.
 public_url = "https://d1pbjdmktpilh0.cloudfront.net"
 max_upload_size_bytes = 10485760
-upload_success_redirect = "http://100.65.163.6:3000/uploadSuccess"
+upload_success_redirect = "https://griffinmail.app/uploadSuccess"
