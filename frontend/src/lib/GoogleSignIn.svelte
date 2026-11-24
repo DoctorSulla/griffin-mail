@@ -19,7 +19,7 @@
 		script.defer = true;
 		script.onload = () => {
 			google.accounts.id.initialize({
-				client_id: '988343938519-vle7kps2l5f6cdnjluibda25o66h2jpn.apps.googleusercontent.com',
+				client_id: '529779442848-9rpnhdmlsunh67ca3unpnv04h7hrkdoo.apps.googleusercontent.com',
 				callback: handleCredentialResponse,
 				nonce: nonce
 			});

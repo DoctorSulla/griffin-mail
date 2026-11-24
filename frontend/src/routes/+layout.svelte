@@ -28,6 +28,8 @@
 			navigation: false
 		},
 		{ text: 'Unsubscribe', href: '/unsubscribe', allowed: 'always', navigation: false },
+		{ text: 'Privacy Policy', href: '/privacy', allowed: 'always', navigation: false },
+		{ text: 'Terms of Service', href: '/terms', allowed: 'always', navigation: false },
 		{ text: 'Initial setup', href: '/setup', allowed: 'always', navigation: false },
 		{ text: 'Lists', href: '/lists', allowed: 'authenticated' },
 		{ text: 'List details', href: '/lists/detail', allowed: 'authenticated', navigation: false },
@@ -56,7 +58,7 @@
 		let route = currentRoute();
 		const setup = await api.getSetupStatus();
 		if (setup.ok && setup.data?.needs_admin) {
-			if (route?.href !== '/setup') {
+			if (route?.href !== '/setup' && route?.href !== '/privacy' && route?.href !== '/terms') {
 				goto('/setup');
 			}
 			return;
@@ -97,18 +99,31 @@
 	<title>{title}</title>
 </svelte:head>
 
-<nav class="bg-blue-700 px-3 py-3">
-	<div class="m-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-2">
-		{#each links as link}
-			<a class="font-medium text-white hover:text-blue-100" href={link.href}>{link.text}</a>
-		{/each}
-		{#if loggedIn}
-			<button class="cursor-pointer font-medium text-white hover:text-blue-100" onclick={logout}>
-				Logout
-			</button>
-		{/if}
-	</div>
-</nav>
-<main class="m-auto max-w-7xl px-4">
-	{@render children?.()}
-</main>
+<div class="flex min-h-screen flex-col">
+	<nav class="bg-blue-700 px-3 py-3">
+		<div class="m-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-2">
+			{#each links as link}
+				<a class="font-medium text-white hover:text-blue-100" href={link.href}>{link.text}</a>
+			{/each}
+			{#if loggedIn}
+				<button class="cursor-pointer font-medium text-white hover:text-blue-100" onclick={logout}>
+					Logout
+				</button>
+			{/if}
+		</div>
+	</nav>
+	<main class="m-auto w-full max-w-7xl flex-1 px-4">
+		{@render children?.()}
+	</main>
+	<footer class="border-t border-gray-200 bg-white">
+		<div
+			class="m-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-4 text-sm text-gray-500"
+		>
+			<span>Griffin Mail</span>
+			<div class="flex items-center gap-6">
+				<a class="hover:text-gray-900" href="/privacy">Privacy Policy</a>
+				<a class="hover:text-gray-900" href="/terms">Terms of Service</a>
+			</div>
+		</div>
+	</footer>
+</div>

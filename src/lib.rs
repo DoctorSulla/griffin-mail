@@ -75,7 +75,7 @@ pub async fn start_app() {
 
     let token_bucket_app_state = app_state.clone();
 
-    initialise_token_bucket(token_bucket_app_state, 1, 1, 1);
+    initialise_token_bucket(token_bucket_app_state, 10, 10, 1);
 
     start_session_cleaner(app_state.clone()).await;
 

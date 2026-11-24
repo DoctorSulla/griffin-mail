@@ -42,6 +42,10 @@
 		{#if created}
 			<div class="rounded-md border border-green-200 bg-green-50 p-5 text-center">
 				<p class="font-medium text-green-800">Administrator account created.</p>
+				<p class="mt-2 text-sm text-green-700">
+					A verification email has been sent to <strong>{email}</strong>. Sign in to verify your
+					email address.
+				</p>
 				<a
 					href="/login"
 					class="mt-4 inline-block rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
