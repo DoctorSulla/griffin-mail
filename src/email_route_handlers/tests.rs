@@ -423,6 +423,29 @@ fn media_names_must_not_escape_the_media_prefix() {
     assert!(!is_valid_media_name("events/"));
 }
 
+#[test]
+fn media_url_from_key_uses_configured_public_url() {
+    let config = MediaConfig {
+        bucket: "test-bucket".to_string(),
+        prefix: "media/".to_string(),
+        public_url: "https://d1pbjdmktpilh0.cloudfront.net/".to_string(),
+        max_upload_size_bytes: 10485760,
+        upload_success_redirect: "http://localhost:3000/uploadSuccess".to_string(),
+    };
+
+    assert_eq!(
+        media_url_from_key(&config, "media/photo.jpg").as_deref(),
+        Some("https://d1pbjdmktpilh0.cloudfront.net/photo.jpg")
+    );
+    assert_eq!(
+        media_url_from_key(&config, "media/events/my photo (1).jpg").as_deref(),
+        Some("https://d1pbjdmktpilh0.cloudfront.net/events/my%20photo%20%281%29.jpg")
+    );
+    assert_eq!(media_url_from_key(&config, "other/photo.jpg"), None);
+    assert_eq!(media_url_from_key(&config, "media/../secret.txt"), None);
+    assert_eq!(media_url_from_key(&config, "media/"), None);
+}
+
 #[sqlx::test(migrations = "./migrations")]
 async fn media_upload_and_delete_require_manage_media_permission(pool: PgPool) {
     insert_user(&pool, "uploader@example.com").await;

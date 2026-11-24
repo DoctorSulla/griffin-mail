@@ -2,7 +2,7 @@ use crate::default_route_handlers::{AppError, ErrorList};
 use aws_credential_types::provider::ProvideCredentials;
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
 };
@@ -15,7 +15,7 @@ use std::{collections::BTreeMap, sync::Arc};
 use tracing::{Level, event};
 
 use crate::{
-    config::AppState,
+    config::{AppState, MediaConfig},
     user::{User, VerifiedEmailUser},
     utilities::{Email, send_email},
 };
@@ -902,12 +902,43 @@ fn encode_s3_key(key: &str) -> String {
         .join("/")
 }
 
+#[derive(Deserialize)]
+pub struct MediaUrlQuery {
+    pub key: String,
+}
+
+#[derive(Serialize)]
+pub struct MediaUrlResponse {
+    pub url: String,
+}
+
+fn media_url_from_name(media_config: &MediaConfig, name: &str) -> String {
+    let public_url = media_config.public_url.trim_end_matches('/');
+    format!("{public_url}/{}", encode_s3_key(name))
+}
+
+fn media_url_from_key(media_config: &MediaConfig, key: &str) -> Option<String> {
+    let name = key.strip_prefix(&media_config.prefix)?;
+    if !is_valid_media_name(name) {
+        return None;
+    }
+    Some(media_url_from_name(media_config, name))
+}
+
+pub async fn get_media_url(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<MediaUrlQuery>,
+) -> Result<(StatusCode, Json<MediaUrlResponse>), AppError> {
+    let url =
+        media_url_from_key(&state.config.media, &query.key).ok_or(ErrorList::InvalidMediaName)?;
+    Ok((StatusCode::OK, Json(MediaUrlResponse { url })))
+}
+
 pub async fn get_media(
     State(state): State<Arc<AppState>>,
 ) -> Result<(StatusCode, Json<Vec<MediaObject>>), AppError> {
     let client = aws_sdk_s3::Client::new(&state.aws_sdk_config);
     let media_config = &state.config.media;
-    let public_url = media_config.public_url.trim_end_matches('/');
 
     let pages: Vec<_> = client
         .list_objects_v2()
@@ -929,7 +960,7 @@ pub async fn get_media(
             }
             Some(MediaObject {
                 name: name.to_string(),
-                url: format!("{public_url}/{}", encode_s3_key(name)),
+                url: media_url_from_name(media_config, name),
                 size: object.size,
                 last_modified: object.last_modified.map(|date| date.to_string()),
             })

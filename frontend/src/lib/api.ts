@@ -105,6 +105,10 @@ export interface MediaObject {
 	last_modified?: string;
 }
 
+export interface MediaUrl {
+	url: string;
+}
+
 export interface ApiResponse {
 	response_type: string;
 	message: string;
@@ -316,6 +320,10 @@ export const api = {
 
 	async getMedia(): Promise<ResourceResult<MediaObject[]>> {
 		return resourceCall('/email/media');
+	},
+
+	async getMediaUrl(key: string): Promise<ResourceResult<MediaUrl>> {
+		return resourceCall(`/email/media_url?key=${encodeURIComponent(key)}`);
 	},
 
 	async deleteMedia(name: string): Promise<ResourceResult> {

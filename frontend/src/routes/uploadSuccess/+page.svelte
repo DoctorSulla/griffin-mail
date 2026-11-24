@@ -2,6 +2,8 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { CircleCheck, Copy, Check, ExternalLink, Upload } from '@lucide/svelte';
+	import { api } from '$lib/api';
+	import Feedback from '$lib/Feedback.svelte';
 
 	type MediaKind = 'image' | 'video' | 'audio' | 'other';
 
@@ -9,9 +11,9 @@
 	// (SvelteKit throws if url.searchParams is read while prerendering).
 	// Only read them once we're running in the browser.
 	let mounted = $state(false);
-	onMount(() => {
-		mounted = true;
-	});
+	let resolving = $state(false);
+	let resolvedUrl = $state('');
+	let resolveError = $state('');
 
 	function param(...names: string[]): string {
 		if (!mounted) return '';
@@ -45,19 +47,27 @@
 		return 'other';
 	}
 
-	// S3's success_action_redirect appends ?bucket=…&key=…&etag=… rather than a full URL,
-	// so build the object URL from those when no explicit url param is given.
-	const S3_REGION = 'eu-west-1';
+	// S3's success_action_redirect appends ?bucket=…&key=…&etag=… rather than a public URL,
+	// so ask the backend to resolve the S3 key to the configured CloudFront URL.
+	onMount(async () => {
+		mounted = true;
+		if (param('url', 'media_url', 'mediaUrl')) return;
 
-	function s3ObjectUrl(bucket: string, key: string): string {
-		if (!bucket || !key) return '';
-		const path = key.split('/').map(encodeURIComponent).join('/');
-		return `https://${bucket}.s3.${S3_REGION}.amazonaws.com/${path}`;
-	}
+		const key = param('key');
+		if (!key) return;
 
-	let rawUrl = $derived(
-		param('url', 'media_url', 'mediaUrl') || s3ObjectUrl(param('bucket'), param('key'))
-	);
+		resolving = true;
+		const result = await api.getMediaUrl(key);
+		resolving = false;
+
+		if (result.ok && result.data?.url) {
+			resolvedUrl = result.data.url;
+		} else {
+			resolveError = result.message || 'Could not resolve media URL.';
+		}
+	});
+
+	let rawUrl = $derived(param('url', 'media_url', 'mediaUrl') || resolvedUrl);
 
 	let mediaUrl = $derived(rawUrl && isSafeUrl(rawUrl) ? rawUrl : '');
 	let kind = $derived<MediaKind>(mediaUrl ? mediaKind(mediaUrl) : 'other');
@@ -87,8 +97,12 @@
 	</div>
 	<p class="mt-1 text-gray-600">Image upload processed successfully.</p>
 
-	{#if !mounted}
+	{#if !mounted || resolving}
 		<!-- params are only available client-side; avoid flashing the warning -->
+	{:else if resolveError}
+		<div class="mt-6">
+			<Feedback error={resolveError} />
+		</div>
 	{:else if !mediaUrl}
 		<div class="mt-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
 			No media details were provided in the URL.

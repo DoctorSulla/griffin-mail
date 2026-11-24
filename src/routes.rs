@@ -90,6 +90,7 @@ pub fn get_email_routes() -> Router<Arc<AppState>> {
             get(email_route_handlers::get_s3_upload_details),
         )
         .route("/email/media", get(email_route_handlers::get_media))
+        .route("/email/media_url", get(email_route_handlers::get_media_url))
         .route(
             "/email/media/{*name}",
             delete(email_route_handlers::delete_media),
