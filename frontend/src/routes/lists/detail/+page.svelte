@@ -11,6 +11,7 @@
 		type UserPermission,
 		type ListPermission
 	} from '$lib/api';
+	import EmailCombobox from '$lib/EmailCombobox.svelte';
 	import Feedback from '$lib/Feedback.svelte';
 	import { isImage, mediaDetails, sortNewestFirst } from '$lib/media';
 
@@ -26,6 +27,7 @@
 	let details = $state<ListWithRecipients | null>(null);
 	let available: Required<Recipient>[] = $state([]);
 	let permissions: UserPermission[] = $state([]);
+	let userEmails: string[] = $state([]);
 	let loading = $state(true);
 	let error = $state('');
 	let success = $state('');
@@ -103,11 +105,18 @@
 		}
 	}
 
+	async function loadUserEmails() {
+		const result = await api.getUserEmails();
+		if (result.ok) {
+			userEmails = result.data ?? [];
+		}
+	}
+
 	onMount(async () => {
 		listId = Number(page.url.searchParams.get('id'));
 		await Promise.all([loadList(), loadTld()]);
 		if (details) {
-			await Promise.all([loadAvailable(), loadPermissions()]);
+			await Promise.all([loadAvailable(), loadPermissions(), loadUserEmails()]);
 		}
 	});
 
@@ -562,13 +571,14 @@
 
 			<section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
 				<h2 class="text-xl font-semibold text-gray-900">List permissions</h2>
-				<form class="mt-4 flex flex-wrap gap-2" onsubmit={grantPermission}>
-					<input
-						type="email"
+				<form autocomplete="off" class="mt-4 flex flex-wrap gap-2" onsubmit={grantPermission}>
+					<EmailCombobox
 						required
+						emails={userEmails}
 						bind:value={permissionEmail}
 						placeholder="User email"
-						class="min-w-56 flex-1 rounded-md border border-gray-300 px-3 py-2"
+						ariaLabel="User email"
+						wrapperClass="min-w-56 flex-1"
 					/>
 					<select bind:value={permission} class="rounded-md border border-gray-300 px-3 py-2">
 						<option value="read">Read</option>

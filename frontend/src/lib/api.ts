@@ -298,6 +298,10 @@ export const api = {
 		return resourceCall(`/email/lists/${id}/permissions`, 'DELETE', permissions);
 	},
 
+	async getUserEmails(): Promise<ResourceResult<string[]>> {
+		return resourceCall('/email/users/emails');
+	},
+
 	async addGlobalPermissions(permissions: UserPermission[]): Promise<ResourceResult> {
 		return resourceCall('/email/users/permissions', 'POST', permissions);
 	},

@@ -179,6 +179,39 @@ async fn user_has_global_permission(
     matches!(result, Ok(Some(true)))
 }
 
+async fn user_can_change_permissions(user: &User, state: Arc<AppState>) -> bool {
+    if user_has_global_permission(user, state.clone(), GlobalPermission::ChangePermission).await {
+        return true;
+    }
+
+    let result = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM list_user_permissions WHERE user_email = $1 AND permission = $2)",
+    )
+    .bind(&user.email)
+    .bind(String::from(ListPermission::ChangePermission))
+    .fetch_one(&state.db_connection_pool)
+    .await;
+
+    matches!(result, Ok(true))
+}
+
+/// Get all registered user emails for users allowed to change global or list permissions.
+pub async fn get_user_emails(
+    State(state): State<Arc<AppState>>,
+    user: VerifiedEmailUser,
+) -> Result<Json<Vec<String>>, AppError> {
+    if !user_can_change_permissions(&user, state.clone()).await {
+        log_permission_denied(&user, "get_user_emails", "change_permission", None);
+        return Err(ErrorList::NoChangePermission.into());
+    }
+
+    let emails = sqlx::query_scalar::<_, String>("SELECT email FROM users ORDER BY email")
+        .fetch_all(&state.db_connection_pool)
+        .await?;
+
+    Ok(Json(emails))
+}
+
 /// Add a new recipient who can then later be added to other lists
 pub async fn add_recipients(
     State(state): State<Arc<AppState>>,

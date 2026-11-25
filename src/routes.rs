@@ -76,6 +76,10 @@ pub fn get_email_routes() -> Router<Arc<AppState>> {
             delete(email_route_handlers::delete_list_permissions),
         )
         .route(
+            "/email/users/emails",
+            get(email_route_handlers::get_user_emails),
+        )
+        .route(
             "/email/users/permissions",
             post(email_route_handlers::add_global_permissions),
         )

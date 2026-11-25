@@ -119,6 +119,8 @@ pub enum ErrorList {
     NoWritePermission,
     #[error("No permission to manage global user permissions")]
     NoManageGlobalPermission,
+    #[error("You do not have permission to change permissions")]
+    NoChangePermission,
     #[error("You do not have permission to upload or delete media")]
     NoManageMediaPermission,
     #[error("Invalid unsubscribe signature")]

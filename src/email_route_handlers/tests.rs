@@ -503,3 +503,82 @@ async fn media_upload_and_delete_require_manage_media_permission(pool: PgPool) {
         ErrorList::InvalidMediaName.to_string()
     );
 }
+
+#[sqlx::test(migrations = "./migrations")]
+async fn get_user_emails_requires_global_or_list_change_permission(pool: PgPool) {
+    insert_user(&pool, "zoe@example.com").await;
+    insert_user(&pool, "alice@example.com").await;
+    insert_user(&pool, "bob@example.com").await;
+    let list_id = insert_list(&pool, "newsletter").await;
+    let state = test_state(pool.clone()).await;
+
+    // A user with only list write permission cannot list all user emails.
+    sqlx::query(
+        "INSERT INTO list_user_permissions (list_id, user_email, permission)
+             VALUES ($1, 'alice@example.com', 'write')",
+    )
+    .bind(list_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let denied = get_user_emails(
+        State(state.clone()),
+        VerifiedEmailUser(test_user("alice@example.com")),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        app_error_message(denied).await,
+        ErrorList::NoChangePermission.to_string()
+    );
+
+    // Granting list change_permission allows fetching sorted user emails.
+    sqlx::query(
+        "INSERT INTO list_user_permissions (list_id, user_email, permission)
+             VALUES ($1, 'alice@example.com', 'change_permission')",
+    )
+    .bind(list_id)
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let Json(list_manager_emails) = expect_ok(
+        get_user_emails(
+            State(state.clone()),
+            VerifiedEmailUser(test_user("alice@example.com")),
+        )
+        .await,
+    )
+    .await;
+    assert_eq!(
+        list_manager_emails,
+        vec![
+            "alice@example.com".to_string(),
+            "bob@example.com".to_string(),
+            "zoe@example.com".to_string(),
+        ]
+    );
+
+    // Granting global change_permission also allows fetching sorted user emails.
+    sqlx::query(
+        "INSERT INTO global_user_permissions (user_email, permission)
+             VALUES ('bob@example.com', 'change_permission')",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+
+    let Json(global_manager_emails) = expect_ok(
+        get_user_emails(State(state), VerifiedEmailUser(test_user("bob@example.com"))).await,
+    )
+    .await;
+    assert_eq!(
+        global_manager_emails,
+        vec![
+            "alice@example.com".to_string(),
+            "bob@example.com".to_string(),
+            "zoe@example.com".to_string(),
+        ]
+    );
+}

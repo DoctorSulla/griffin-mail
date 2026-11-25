@@ -1,12 +1,22 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { api, type GlobalPermission } from '$lib/api';
+	import EmailCombobox from '$lib/EmailCombobox.svelte';
 	import Feedback from '$lib/Feedback.svelte';
 
 	let userEmail = $state('');
+	let userEmails: string[] = $state([]);
 	let permission: GlobalPermission = $state('manage_list');
 	let loading = $state(false);
 	let error = $state('');
 	let success = $state('');
+
+	onMount(async () => {
+		const result = await api.getUserEmails();
+		if (result.ok) {
+			userEmails = result.data ?? [];
+		}
+	});
 
 	async function changePermission(action: 'grant' | 'revoke') {
 		loading = true;
@@ -40,6 +50,7 @@
 	</p>
 
 	<form
+		autocomplete="off"
 		class="mt-6 space-y-5 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
 		onsubmit={(event) => submit(event, 'grant')}
 	>
@@ -47,12 +58,13 @@
 			<label for="permission-email" class="block text-sm font-medium text-gray-700"
 				>User email</label
 			>
-			<input
+			<EmailCombobox
 				id="permission-email"
-				type="email"
 				required
+				emails={userEmails}
 				bind:value={userEmail}
-				class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+				placeholder="Type to search or enter user email"
+				wrapperClass="mt-1"
 			/>
 		</div>
 		<div>
