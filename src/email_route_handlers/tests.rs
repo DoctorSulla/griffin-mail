@@ -316,7 +316,7 @@ fn test_verify_unsubscribe_signature_invalid_signature() {
 #[test]
 fn test_verify_unsubscribe_signature_expired_link() {
     let email = "test@example.com";
-    let expired_timestamp = chrono::Utc::now().timestamp() - 1000;
+    let expired_timestamp = jiff::Timestamp::now().as_second() - 1000;
     let unsubscribe_text = format!("{}|{}", expired_timestamp, email);
 
     // Generate a valid signature for expired text using the test secret
@@ -570,7 +570,11 @@ async fn get_user_emails_requires_global_or_list_change_permission(pool: PgPool)
     .unwrap();
 
     let Json(global_manager_emails) = expect_ok(
-        get_user_emails(State(state), VerifiedEmailUser(test_user("bob@example.com"))).await,
+        get_user_emails(
+            State(state),
+            VerifiedEmailUser(test_user("bob@example.com")),
+        )
+        .await,
     )
     .await;
     assert_eq!(

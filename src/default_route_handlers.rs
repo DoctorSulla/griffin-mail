@@ -11,8 +11,8 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use chrono::Utc;
 use http::header::{self, HeaderMap, SET_COOKIE};
+use jiff::Timestamp;
 use jwt_verifier::JwtVerifierClient;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
@@ -487,7 +487,7 @@ pub async fn verify_email(
     State(state): State<Arc<AppState>>,
     Json(verification_details): Json<VerificationDetails>,
 ) -> Result<Json<ApiResponse>, AppError> {
-    let now = Utc::now().timestamp();
+    let now = Timestamp::now().as_second();
 
     let code_exists = sqlx::query(
         "SELECT 1 FROM codes WHERE code_type = 'EmailVerification' AND email = $1 AND code = $2 AND expiry_ts > $3"
@@ -627,7 +627,7 @@ pub async fn password_reset_complete(
     // Check if code is valid
     let mut tx = state.db_connection_pool.begin().await?;
     let code = sqlx::query_as::<_,CodeAndEmail>("SELECT code,email FROM codes WHERE code_type='PasswordReset' AND used=false AND expiry_ts > $1 AND code=$2 FOR UPDATE")
-            .bind(Utc::now().timestamp())
+            .bind(Timestamp::now().as_second())
                     .bind(password_reset_response.code).fetch_optional(&mut *tx).await?;
 
     if let Some(code) = code {
@@ -743,7 +743,7 @@ pub async fn get_nonce() -> Result<Json<ApiResponse>, AppError> {
     let mut lock = NONCE_STORE.write().expect("Couldn't acquire lock");
     let id = generate_unique_id(20);
 
-    let now = Utc::now().timestamp();
+    let now = Timestamp::now().as_second();
 
     lock.retain(|_k, v| *v + NONCE_EXPIRATION > now);
 

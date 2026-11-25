@@ -6,10 +6,10 @@ use crate::default_route_handlers::{
 };
 use crate::user::User;
 use crate::utilities::{Email, generate_unique_id, hash_password, send_email};
-use chrono::Utc;
 use cookie::time::Duration;
 use cookie::{Cookie, SameSite};
 use http::HeaderMap;
+use jiff::Timestamp;
 use sqlx::postgres::PgRow;
 use std::sync::Arc;
 use tracing::{Level, event};
@@ -54,7 +54,7 @@ pub async fn validate_cookie(
                     "SELECT email FROM SESSIONS WHERE session_key=$1 AND expiry > $2",
                 )
                 .bind(cookie.value())
-                .bind(Utc::now().timestamp())
+                .bind(Timestamp::now().as_second())
                 .fetch_optional(&state.db_connection_pool)
                 .await?;
                 if let Some(username) = session {
@@ -86,7 +86,7 @@ pub async fn create_session(user: &User, state: Arc<AppState>) -> Result<Cookie<
         .same_site(SameSite::Lax)
         .build();
 
-    let expiry = Utc::now().timestamp()
+    let expiry = Timestamp::now().as_second()
         + (state.config.server.session_length_in_days
             * HOURS_IN_DAY as i64
             * SECONDS_IN_HOUR as i64);
@@ -129,7 +129,7 @@ pub async fn create_registration(
     );
 
     let hashed_password = hash_password(&registration_details.password);
-    let registration_ts = Utc::now().timestamp();
+    let registration_ts = Timestamp::now().as_second();
 
     match identity_provider {
         IdentityProvider::Google => sqlx::query(
@@ -215,15 +215,15 @@ pub async fn add_code(
     .bind(Into::<String>::into(code_type))
     .bind(email)
     .bind(code)
-    .bind(Utc::now().timestamp())
-    .bind(Utc::now().timestamp() + SECONDS_IN_HOUR as i64)
+    .bind(Timestamp::now().as_second())
+    .bind(Timestamp::now().as_second() + SECONDS_IN_HOUR as i64)
     .execute(&state.db_connection_pool)
     .await?;
     Ok(())
 }
 
 pub async fn has_valid_email_code(state: Arc<AppState>, user: &User) -> Option<PgRow> {
-    let now = Utc::now().timestamp();
+    let now = Timestamp::now().as_second();
 
     sqlx::query(
         "SELECT 1 FROM codes WHERE code_type = 'EmailVerification' AND email = $1 AND expiry_ts > $2"

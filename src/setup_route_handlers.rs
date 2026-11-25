@@ -10,7 +10,7 @@ use crate::{
     utilities::hash_password,
 };
 use axum::{Json, extract::State};
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{Level, event};
@@ -76,7 +76,7 @@ pub async fn create_administrator(
     }
 
     let hashed_password = hash_password(&details.password);
-    let registration_ts = Utc::now().timestamp();
+    let registration_ts = Timestamp::now().as_second();
     let mut transaction = state.db_connection_pool.begin().await?;
 
     // Serialize setup with every insert/delete on this table so the

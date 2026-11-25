@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use crate::AppState;
 
-use chrono::Utc;
+use jiff::Timestamp;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Email {
@@ -80,7 +80,7 @@ pub fn generate_unique_id(length: u8) -> String {
 pub async fn start_session_cleaner(state: Arc<AppState>) {
     tokio::spawn(async move {
         loop {
-            let now = Utc::now().timestamp();
+            let now = Timestamp::now().as_second();
             let delete = sqlx::query("DELETE FROM sessions WHERE $1 > expiry")
                 .bind(now)
                 .execute(&state.db_connection_pool)

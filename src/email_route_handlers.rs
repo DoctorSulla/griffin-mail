@@ -380,7 +380,7 @@ pub async fn get_list_by_id(
 fn generate_unsubscribe_link(server_url: &str, email: &str, hmac_secret: &str) -> String {
     type HmacSha256 = Hmac<Sha256>;
 
-    let expires = chrono::Utc::now().timestamp() + (30 * 24 * 60 * 60); // 30 days
+    let expires = Timestamp::now().as_second() + (30 * 24 * 60 * 60); // 30 days
     let unsubscribe_text = format!("{}|{}", expires, email);
 
     let mut mac =
@@ -802,7 +802,7 @@ fn verify_unsubscribe_signature(
     }
 
     let expires: i64 = parts[0].parse().unwrap_or(0);
-    if expires > 0 && expires < chrono::Utc::now().timestamp() {
+    if expires > 0 && expires < Timestamp::now().as_second() {
         return Err(ErrorList::UnsubscribeLinkExpired);
     }
 

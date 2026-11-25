@@ -22,12 +22,12 @@ primary_region = 'lhr'
 
 [[files]]
   guest_path = "/root/.aws/cert/griffin_mail.crt"
-  local_path = "/home/matt/.aws/cert/griffin_mail.crt"
+  secret_name = "CERT"
 
 [[files]]
   guest_path = "/root/.aws/cert/griffin_mail.key"
-  local_path = "/home/matt/.aws/cert/griffin_mail.key"
+  secret_name = "KEY"
 
 [[files]]
   guest_path = "/root/.aws/credentials"
-  local_path = "/home/matt/.aws/ra_credentials"
+  secret_name = "CREDENTIALS"
