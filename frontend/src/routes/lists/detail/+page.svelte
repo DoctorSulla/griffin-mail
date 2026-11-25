@@ -23,7 +23,7 @@
 	];
 
 	let listId = $state(0);
-	let details: ListWithRecipients | null = $state(null);
+	let details = $state<ListWithRecipients | null>(null);
 	let available: Required<Recipient>[] = $state([]);
 	let permissions: UserPermission[] = $state([]);
 	let loading = $state(true);
@@ -49,6 +49,21 @@
 	let email = $state({ subject: '', body: '', from: '', reply_to: '' });
 	let permissionEmail = $state('');
 	let permission: ListPermission = $state('read');
+	let currentFilter = $state('');
+	let availableFilter = $state('');
+
+	function filterRecipients(list: Required<Recipient>[], query: string) {
+		const trimmed = query.trim().toLowerCase();
+		if (!trimmed) return list;
+		return list.filter(
+			(recipient) =>
+				recipient.name.toLowerCase().includes(trimmed) ||
+				recipient.email.toLowerCase().includes(trimmed)
+		);
+	}
+
+	let filteredCurrent = $derived(filterRecipients(details?.recipients ?? [], currentFilter));
+	let filteredAvailable = $derived(filterRecipients(available, availableFilter));
 
 	async function loadList() {
 		if (!Number.isInteger(listId) || listId < 1) {
@@ -279,22 +294,37 @@
 		<div class="mt-6 grid gap-6 lg:grid-cols-2">
 			<section class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
 				<h2 class="text-xl font-semibold text-gray-900">Current recipients</h2>
-				<p class="text-sm text-gray-500">{details.recipients.length} on this list</p>
-				<div class="mt-3 divide-y divide-gray-100">
-					{#each details.recipients as recipient}
+				<p class="text-sm text-gray-500">
+					{#if currentFilter.trim()}
+						Showing {filteredCurrent.length} of {details.recipients.length} on this list
+					{:else}
+						{details.recipients.length} on this list
+					{/if}
+				</p>
+				<input
+					type="search"
+					bind:value={currentFilter}
+					placeholder="Filter current recipients by name or email…"
+					aria-label="Filter current recipients"
+					class="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+				/>
+				<div class="mt-3 max-h-80 divide-y divide-gray-100 overflow-y-auto pr-4">
+					{#each filteredCurrent as recipient (recipient.id)}
 						<div class="flex items-center justify-between gap-3 py-3">
-							<div>
-								<p class="font-medium">{recipient.name}</p>
-								<p class="text-sm text-gray-600">{recipient.email}</p>
+							<div class="min-w-0">
+								<p class="truncate font-medium">{recipient.name}</p>
+								<p class="truncate text-sm text-gray-600">{recipient.email}</p>
 							</div>
 							<button
 								type="button"
 								onclick={() => removeRecipient(recipient)}
-								class="text-sm font-medium text-red-600 hover:text-red-800">Remove</button
+								class="shrink-0 text-sm font-medium text-red-600 hover:text-red-800">Remove</button
 							>
 						</div>
 					{:else}
-						<p class="py-4 text-sm text-gray-500">This list is empty.</p>
+						<p class="py-4 text-sm text-gray-500">
+							{details.recipients.length === 0 ? 'This list is empty.' : 'No matching recipients.'}
+						</p>
 					{/each}
 				</div>
 			</section>
@@ -304,22 +334,38 @@
 				{#if availableMessage}
 					<p class="mt-3 text-sm text-amber-700">{availableMessage}</p>
 				{:else}
-					<div class="mt-3 max-h-80 divide-y divide-gray-100 overflow-auto">
-						{#each available as recipient}
+					<p class="text-sm text-gray-500">
+						{#if availableFilter.trim()}
+							Showing {filteredAvailable.length} of {available.length} available
+						{:else}
+							{available.length} available
+						{/if}
+					</p>
+					<input
+						type="search"
+						bind:value={availableFilter}
+						placeholder="Filter available recipients by name or email…"
+						aria-label="Filter available recipients"
+						class="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+					/>
+					<div class="mt-3 max-h-80 divide-y divide-gray-100 overflow-y-auto pr-4">
+						{#each filteredAvailable as recipient (recipient.id)}
 							<div class="flex items-center justify-between gap-3 py-3">
-								<div>
-									<p class="font-medium">{recipient.name}</p>
-									<p class="text-sm text-gray-600">{recipient.email}</p>
+								<div class="min-w-0">
+									<p class="truncate font-medium">{recipient.name}</p>
+									<p class="truncate text-sm text-gray-600">{recipient.email}</p>
 								</div>
 								<button
 									type="button"
 									onclick={() => addRecipient(recipient)}
-									class="text-sm font-medium text-blue-600 hover:text-blue-800">Add</button
+									class="shrink-0 text-sm font-medium text-blue-600 hover:text-blue-800">Add</button
 								>
 							</div>
 						{:else}
 							<p class="py-4 text-sm text-gray-500">
-								Every directory recipient is already on this list.
+								{available.length === 0
+									? 'Every directory recipient is already on this list.'
+									: 'No matching recipients.'}
 							</p>
 						{/each}
 					</div>
